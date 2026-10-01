@@ -1,0 +1,18 @@
+.focused-record {
+  outline: 2px solid var(--primary, #5146e5);
+  outline-offset: 2px;
+  animation: familyhub-focus-pulse 1.8s ease-out 1;
+}
+@keyframes familyhub-focus-pulse {
+  0% {
+    background: #eceaff;
+  }
+  100% {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .focused-record {
+    animation: none;
+  }
+}

@@ -1,0 +1,35 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: familyhub
+          POSTGRES_USER: familyhub
+          POSTGRES_PASSWORD: familyhub_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U familyhub -d familyhub"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://familyhub:familyhub_ci@localhost:5432/familyhub
+      JWT_SECRET: ci-only-secret-with-enough-randomness-1234567890
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:deploy
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
