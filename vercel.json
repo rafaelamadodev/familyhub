@@ -4,7 +4,7 @@
     "api": {
       "root": "apps/api",
       "framework": "fastify",
-      "buildCommand": "npm run build",
+      "buildCommand": "npm run db:generate && npm run build",
       "installCommand": "npm install",
       "functions": {
         "api/[...path].ts": { "maxDuration": 30 },

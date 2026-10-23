@@ -82,9 +82,17 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       // Use APP_URL when the browser does not provide a valid referrer.
     }
     const state = randomBytes(32).toString("base64url");
-    await db.googleAuthState.create({
-      data: { stateHash: hashOAuthState(state), returnUrl, expiresAt: new Date(Date.now() + 10 * 60_000) },
-    });
+    try {
+      await db.googleAuthState.create({
+        data: { stateHash: hashOAuthState(state), returnUrl, expiresAt: new Date(Date.now() + 10 * 60_000) },
+      });
+    } catch (error) {
+      // Do not let a database outage surface as Vercel's opaque
+      // FUNCTION_INVOCATION_FAILED page. Keep the reason out of the client,
+      // but preserve a short code in the server logs for diagnosis.
+      app.log.error({ code: (error as { code?: string }).code ?? "DB_ERROR" }, "Falha ao iniciar login Google");
+      throw new HttpError(503, "O serviço de login está temporariamente indisponível");
+    }
     const target = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     target.search = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
