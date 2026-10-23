@@ -67,7 +67,7 @@ Apesar dos nomes `MINIO_*`, os valores podem apontar para armazenamento compatí
 
 Como o produto usará somente Google OAuth, não é necessário contratar SMTP nem configurar e-mails de confirmação ou recuperação de senha.
 
-Não publique `start:worker` e não configure Redis/BullMQ na Vercel. A limpeza de arquivos pendentes é executada pela rota `/api/cron/maintenance` a cada 15 minutos.
+Não publique `start:worker` e não configure Redis/BullMQ na Vercel. No plano Hobby, a limpeza de arquivos pendentes é executada uma vez por dia pela rota `/api/cron/maintenance`.
 
 ## Etapa 5 — Variáveis de ambiente
 
