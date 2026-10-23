@@ -1,4 +1,6 @@
 const definitions: Array<[string, string, string]> = [
+  ["get", "/api/v1/auth/google", "Start Google OAuth account creation or login."],
+  ["get", "/api/v1/auth/google/callback", "Complete Google OAuth account creation or login."],
   [
     "post",
     "/api/v1/auth/register",
@@ -56,9 +58,33 @@ const definitions: Array<[string, string, string]> = [
   ["post", "/api/v1/shopping-items", "Create a shopping item."],
   ["patch", "/api/v1/shopping-items/{id}", "Update a shopping item."],
   ["delete", "/api/v1/shopping-items/{id}", "Delete a shopping item."],
+  ["get", "/api/v1/shopping-lists/{id}/pdf", "Download a private PDF containing the shopping list items."],
   ["get", "/api/v1/events", "List family events."],
   ["post", "/api/v1/events", "Create an event."],
   ["patch", "/api/v1/events/{id}", "Update an event."],
+  [
+    "get",
+    "/api/v1/integrations/google-calendar",
+    "Read Google Calendar connection status for a family administrator.",
+  ],
+  [
+    "get",
+    "/api/v1/integrations/google-calendar/connect",
+    "Begin Google OAuth 2.0 authorization for a family administrator.",
+  ],
+  ["get", "/api/v1/integrations/google-calendar/callback", "Complete one-time Google OAuth authorization."],
+  [
+    "get",
+    "/api/v1/integrations/google-calendar/calendars",
+    "List writable Google calendars for the connected account.",
+  ],
+  ["put", "/api/v1/integrations/google-calendar/calendar", "Select the destination calendar."],
+  ["post", "/api/v1/integrations/google-calendar/sync", "Synchronize FamilyHub events to Google Calendar."],
+  [
+    "delete",
+    "/api/v1/integrations/google-calendar",
+    "Disconnect Google Calendar without deleting external copies.",
+  ],
   ["get", "/api/v1/notifications", "List notifications for the authenticated member."],
   ["patch", "/api/v1/notifications/{id}/read", "Mark notification read."],
   ["get", "/api/v1/notification-preferences", "Read notification preferences."],
@@ -84,9 +110,17 @@ const definitions: Array<[string, string, string]> = [
   ["post", "/api/v1/growth-records", "Create a growth measurement."],
   ["delete", "/api/v1/growth-records/{id}", "Delete a growth measurement."],
   ["get", "/api/v1/health-records", "List health records; requires sensitive module permissions."],
-  ["post", "/api/v1/health-records", "Create a health record."],
-  ["patch", "/api/v1/health-records/{id}", "Update a health record."],
-  ["delete", "/api/v1/health-records/{id}", "Delete a health record."],
+  [
+    "post",
+    "/api/v1/health-records",
+    "Create a health record. A future, incomplete planned record also creates a calendar event with only its title, date, and time; notes, professional, specialty, and child details are not sent to Google Calendar.",
+  ],
+  [
+    "patch",
+    "/api/v1/health-records/{id}",
+    "Update a health record and synchronize its future calendar event containing only title, date, and time.",
+  ],
+  ["delete", "/api/v1/health-records/{id}", "Delete a health record and remove its linked calendar reminder."],
   ["get", "/api/v1/finance", "List family finances; requires sensitive module permissions."],
   ["post", "/api/v1/finance", "Create a finance entry."],
   ["patch", "/api/v1/finance/{id}", "Update a finance entry."],
@@ -128,7 +162,9 @@ export const openApiDocument = {
           tags: [path.split("/")[3] ?? "api"],
           ...(path.startsWith("/api/v1/auth/register") ||
           path === "/api/v1/auth/login" ||
-          path === "/api/v1/auth/refresh"
+          path === "/api/v1/auth/refresh" ||
+          path === "/api/v1/auth/google/callback" ||
+          path === "/api/v1/integrations/google-calendar/callback"
             ? {}
             : { security: [{ BearerAuth: [] }] }),
           responses: {

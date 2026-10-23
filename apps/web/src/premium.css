@@ -6,6 +6,113 @@
   --line: #e6e8f0;
   --violet-wash: #f1f2ff;
 }
+
+/* Identidade editorial: superfícies calmas, contraste refinado e movimento sutil. */
+:root {
+  --primary: #635bff;
+  --primary-dark: #4239c7;
+  --ink: #15182b;
+  --muted: #707892;
+  --line: #e4e6ef;
+  --page: #f6f7fb;
+  --surface: #fff;
+}
+body {
+  background: var(--page);
+}
+.brand {
+  gap: 10px;
+  font-size: 26px;
+  letter-spacing: -1.4px;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+.brand:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+.brand img {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 6px 10px #5146e52b);
+}
+.sidebar {
+  background: color-mix(in srgb, var(--surface) 92%, #eef0ff);
+  border-right-color: var(--line);
+}
+.sidebar > .brand {
+  padding-bottom: 28px;
+}
+.nav-link {
+  padding: 12px 14px;
+  border-radius: 11px;
+  letter-spacing: 0.01em;
+}
+.nav-link.active {
+  background: linear-gradient(90deg, #eeedff, #f7f7ff);
+}
+.topbar {
+  height: 70px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(18px);
+}
+.content {
+  padding-top: 52px;
+}
+.page-heading h1,
+.welcome h1 {
+  letter-spacing: -1.8px;
+}
+.panel,
+.summary,
+.empty-state {
+  border-radius: 16px;
+  box-shadow: 0 14px 40px #1c24500b;
+}
+.panel:hover,
+.summary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 48px #1c245016;
+}
+.button {
+  border-radius: 11px;
+  padding: 12px 18px;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    filter 0.22s ease;
+}
+.button-primary:hover {
+  filter: saturate(1.12);
+  transform: translateY(-2px);
+}
+.record-row {
+  border-radius: 15px;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.record-row:hover {
+  transform: translateX(3px);
+  border-color: #b9b6f5;
+  box-shadow: 0 8px 22px #1c24500c;
+}
+.bottom-nav {
+  backdrop-filter: blur(18px);
+}
+@media (max-width: 820px) {
+  .topbar {
+    height: 62px;
+  }
+  .content {
+    padding-top: 30px;
+  }
+  .brand {
+    font-size: 24px;
+  }
+}
 body {
   background: #f7f8fc;
   color: var(--ink);
@@ -177,10 +284,6 @@ body {
 }
 .sidebar > .brand {
   font-size: 27px;
-}
-.family-switch {
-  background: linear-gradient(135deg, #f0f1ff, #fafaff);
-  border-color: #e0e2fb;
 }
 .nav-link {
   transition:

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { domainApi, displayDate, localDateTime } from "../../api/domain";
 import { RecordForm, type Field } from "../../components/forms/RecordForm";
 import { AsyncState } from "../../components/ui/AsyncState";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { ErrorNotice } from "../../components/ui/ErrorNotice";
 import { useFamilyData, useRefresh } from "../useFamilyData";
 type HealthRecord = {
   id: string;
@@ -31,6 +33,8 @@ export function HealthPage({
   );
   const refresh = useRefresh();
   const [editing, setEditing] = useState<HealthRecord | "new" | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<HealthRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const labels: Record<string, string> = {
     VACCINE: "Vacina",
@@ -62,8 +66,12 @@ export function HealthPage({
     try {
       await work();
       await refresh();
+      return true;
     } catch (error) {
       setError((error as Error).message);
+      return false;
+    } finally {
+      setDeleting(false);
     }
   }
   return (
@@ -78,7 +86,10 @@ export function HealthPage({
         </button>
       </div>
       <p className="form-notice">
-        O FamilyHub organiza registros e horários. Não substitui orientação de um profissional de saúde.
+        O FamilyHub organiza registros e horários. Registros com data futura também criam um lembrete no
+        calendário; quando o Google Agenda estiver conectado, enviamos o título, a data e o horário. Observações,
+        profissional, especialidade e dados da criança permanecem somente no FamilyHub. Isso não substitui
+        orientação de um profissional.
       </p>
       {editing && (
         <section className="panel editor">
@@ -109,7 +120,7 @@ export function HealthPage({
           />
         </section>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <ErrorNotice title="A alteração não foi concluída" message={error} />}
       <AsyncState pending={query.isPending} error={query.error} retry={query.refetch}>
         <div className="record-list">
           {query.data
@@ -147,10 +158,7 @@ export function HealthPage({
                   </button>
                   <button
                     className="danger-button"
-                    onClick={() => {
-                      if (confirm("Excluir este registro de saúde?"))
-                        void act(() => domainApi.remove("health-records", record.id));
-                    }}
+                    onClick={() => setPendingDelete(record)}
                   >
                     Excluir
                   </button>
@@ -165,6 +173,19 @@ export function HealthPage({
           )}
         </div>
       </AsyncState>
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Excluir este registro?"
+          description={`“${pendingDelete.title}” será removido da saúde da família. O lembrete associado também será cancelado.`}
+          busy={deleting}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={async () => {
+            setDeleting(true);
+            if (await act(() => domainApi.remove("health-records", pendingDelete.id)))
+              setPendingDelete(null);
+          }}
+        />
+      )}
     </>
   );
 }

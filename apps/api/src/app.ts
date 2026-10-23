@@ -18,6 +18,7 @@ import { registerPrivacyRoutes } from "./modules/privacy/routes.js";
 import { HttpError } from "./shared/domain.js";
 import { db } from "./db.js";
 import { registerSearchRoutes } from "./modules/search/routes.js";
+import { registerGoogleCalendarRoutes } from "./modules/integrations/google-calendar-routes.js";
 import { openApiDocument } from "./shared/openapi.js";
 import cookie from "@fastify/cookie";
 import swagger from "@fastify/swagger";
@@ -80,6 +81,7 @@ export async function buildApp() {
   await registerFinanceRoutes(app);
   await registerNotificationRoutes(app);
   await registerPrivacyRoutes(app);
+  await registerGoogleCalendarRoutes(app);
   app.get("/api/v1/openapi.json", async () => openApiDocument);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError)
@@ -93,7 +95,8 @@ export async function buildApp() {
       return reply.code(401).send({ message: "Sessão expirada. Entre novamente." });
     if (known.statusCode === 413)
       return reply.code(413).send({ message: "Arquivo ou formulário excede o limite permitido" });
-    if (known.statusCode === 400) return reply.code(400).send({ message: "Requisição inválida" });
+    if (known.statusCode === 400)
+      return reply.code(400).send({ message: "Não foi possível processar esta solicitação. Confira os dados e tente novamente." });
     if (["P2002", "P2034"].includes(known.code ?? ""))
       return reply
         .code(409)

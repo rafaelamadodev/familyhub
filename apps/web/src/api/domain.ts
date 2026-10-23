@@ -1,4 +1,4 @@
-import { apiRequest, send } from "./client";
+import { API_URL, apiRequest, send } from "./client";
 export type Member = {
   id: string;
   userId: string;
@@ -77,6 +77,16 @@ export function downloadData(data: unknown, filename: string, csv = false) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+export async function downloadShoppingPdf(listId: string, includePurchased = false) {
+  const response = await fetch(`${API_URL}/api/v1/shopping-lists/${listId}/pdf?includePurchased=${includePurchased}`, { credentials: "include" });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "Não foi possível gerar o PDF");
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "lista-de-compras.pdf";
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

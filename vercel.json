@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build --workspace @familyhub/web",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "npm install",
+  "functions": {
+    "api/[...path].ts": {
+      "maxDuration": 30
+    },
+    "api/cron/maintenance.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [{ "path": "/api/cron/maintenance", "schedule": "*/15 * * * *" }],
+  "rewrites": [
+    { "source": "/((?!api(?:/|$)).*)", "destination": "/index.html" }
+  ]
+}

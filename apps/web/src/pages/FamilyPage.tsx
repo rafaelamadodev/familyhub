@@ -7,6 +7,7 @@ import { useRefresh } from "../features/useFamilyData";
 import { RecordForm } from "../components/forms/RecordForm";
 import { AsyncState } from "../components/ui/AsyncState";
 import { PhotoPicker } from "../components/forms/PhotoPicker";
+import { GoogleCalendarSettings } from "../features/family/GoogleCalendarSettings";
 type Invite = {
   id: string;
   email: string | null;
@@ -190,6 +191,7 @@ export function FamilyPage({ family, admin }: { family: Family; admin: boolean }
                 <h3>{member.user.name}</h3>
                 <small>{roles.find((role) => role.value === member.role)?.label}</small>
               </div>
+              {admin && <GoogleCalendarSettings familyId={family.id} />}
               {admin && (
                 <div className="member-controls">
                   <label>

@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 enum FamilyRole {
@@ -13,35 +13,50 @@ enum FamilyRole {
   MEMBER
   VIEWER
 }
+
 enum MembershipStatus {
   ACTIVE
   INVITED
   REVOKED
 }
+
 enum TaskStatus {
   OPEN
   DONE
   ARCHIVED
 }
+
 enum Priority {
   LOW
   NORMAL
   HIGH
 }
+
 enum ShoppingListStatus {
   ACTIVE
   ARCHIVED
 }
+
 enum EventStatus {
   SCHEDULED
   CANCELLED
 }
+
+enum GoogleSyncStatus {
+  NOT_LINKED
+  PENDING
+  SYNCED
+  ERROR
+  REMOVED
+}
+
 enum HealthCategory {
   VACCINE
   APPOINTMENT
   MEDICATION
   NOTE
 }
+
 enum FinancialStatus {
   PLANNED
   PAID
@@ -49,357 +64,432 @@ enum FinancialStatus {
 }
 
 model User {
-  id String @id @default(uuid())
-  name String
-  email String @unique
-  passwordHash String
-  emailVerifiedAt DateTime?
-  photoUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sessions Session[]
-  emailTokens EmailVerificationToken[]
-  resetTokens PasswordResetToken[]
-  memberships FamilyMember[]
-  assignedTasks Task[] @relation("TaskAssignee")
-  createdTasks Task[] @relation("TaskCreator")
-  eventParticipants EventParticipant[]
-  children ChildProfile[] @relation("ChildCreatedBy")
-  auditLogs AuditLog[]
-  privacyRequests PrivacyRequest[]
-  notifications Notification[]
-  devices PushDevice[]
-  notificationPreferences Json?
-  consentPreferences Json?
-  mfaSecretEncrypted String?
-  mfaEnabled Boolean @default(false)
-  reviewedPrivacyRequests PrivacyRequest[] @relation("PrivacyReviewer")
+  id                        String                     @id @default(uuid())
+  name                      String
+  email                     String                     @unique
+  passwordHash              String
+  googleSubject             String?                    @unique
+  emailVerifiedAt           DateTime?
+  photoUrl                  String?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  sessions                  Session[]
+  emailTokens               EmailVerificationToken[]
+  resetTokens               PasswordResetToken[]
+  memberships               FamilyMember[]
+  assignedTasks             Task[]                     @relation("TaskAssignee")
+  createdTasks              Task[]                     @relation("TaskCreator")
+  eventParticipants         EventParticipant[]
+  children                  ChildProfile[]             @relation("ChildCreatedBy")
+  auditLogs                 AuditLog[]
+  privacyRequests           PrivacyRequest[]
+  notifications             Notification[]
+  devices                   PushDevice[]
+  notificationPreferences   Json?
+  consentPreferences        Json?
+  mfaSecretEncrypted        String?
+  mfaEnabled                Boolean                    @default(false)
+  reviewedPrivacyRequests   PrivacyRequest[]           @relation("PrivacyReviewer")
+  googleCalendarConnections GoogleCalendarConnection[]
+  googleOAuthStates         GoogleOAuthState[]
 }
 
 model Session {
-  id String @id @default(uuid())
-  userId String
-  tokenHash String @unique
-  device String?
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  device    String?
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, revokedAt])
 }
 
 model EmailVerificationToken {
-  id String @id @default(uuid())
-  userId String
-  tokenHash String @unique
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
   expiresAt DateTime
-  usedAt DateTime?
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, usedAt])
 }
 
 model PasswordResetToken {
-  id String @id @default(uuid())
-  userId String
-  tokenHash String @unique
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
   expiresAt DateTime
-  usedAt DateTime?
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, usedAt])
 }
 
 model Family {
-  id String @id @default(uuid())
-  name String
-  joinCode String @unique
-  avatarUrl String?
-  timezone String @default("America/Sao_Paulo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  members FamilyMember[]
-  tasks Task[]
-  shoppingLists ShoppingList[]
-  events FamilyEvent[]
-  children ChildProfile[]
-  healthRecords HealthRecord[]
-  documents Document[]
-  finances FinancialEntry[]
-  growthRecords GrowthRecord[]
-  audits AuditLog[]
-  invites FamilyInvite[]
-  notificationPreferences Json?
+  id                       String                    @id @default(uuid())
+  name                     String
+  joinCode                 String                    @unique
+  avatarUrl                String?
+  timezone                 String                    @default("America/Sao_Paulo")
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  members                  FamilyMember[]
+  tasks                    Task[]
+  shoppingLists            ShoppingList[]
+  events                   FamilyEvent[]
+  children                 ChildProfile[]
+  healthRecords            HealthRecord[]
+  documents                Document[]
+  finances                 FinancialEntry[]
+  growthRecords            GrowthRecord[]
+  audits                   AuditLog[]
+  invites                  FamilyInvite[]
+  notificationPreferences  Json?
+  googleCalendarConnection GoogleCalendarConnection?
+  googleOAuthStates        GoogleOAuthState[]
 }
 
 model FamilyMember {
-  id String @id @default(uuid())
-  familyId String
-  userId String
-  role FamilyRole @default(MEMBER)
-  status MembershipStatus @default(ACTIVE)
-  invitedAt DateTime?
-  joinedAt DateTime?
-  createdAt DateTime @default(now())
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sensitivePermissions String[] @default([])
+  id                   String           @id @default(uuid())
+  familyId             String
+  userId               String
+  role                 FamilyRole       @default(MEMBER)
+  status               MembershipStatus @default(ACTIVE)
+  invitedAt            DateTime?
+  joinedAt             DateTime?
+  createdAt            DateTime         @default(now())
+  family               Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sensitivePermissions String[]         @default([])
+
   @@unique([familyId, userId])
   @@index([userId, status])
 }
 
 model Task {
-  id String @id @default(uuid())
-  familyId String
-  creatorId String
-  assigneeId String?
-  title String
-  description String?
-  dueAt DateTime?
-  priority Priority @default(NORMAL)
-  status TaskStatus @default(OPEN)
-  recurrence String?
-  occurrenceOf String? @unique
-  completedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  creator User @relation("TaskCreator", fields: [creatorId], references: [id])
-  assignee User? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  id           String     @id @default(uuid())
+  familyId     String
+  creatorId    String
+  assigneeId   String?
+  title        String
+  description  String?
+  dueAt        DateTime?
+  priority     Priority   @default(NORMAL)
+  status       TaskStatus @default(OPEN)
+  recurrence   String?
+  occurrenceOf String?    @unique
+  completedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  family       Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  creator      User       @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee     User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
   @@index([familyId, status, dueAt])
 }
 
 model ShoppingList {
-  id String @id @default(uuid())
-  familyId String
-  name String
-  status ShoppingListStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  items ShoppingItem[]
+  id        String             @id @default(uuid())
+  familyId  String
+  name      String
+  status    ShoppingListStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  family    Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  items     ShoppingItem[]
+
   @@index([familyId, status])
 }
 
 model ShoppingItem {
-  id String @id @default(uuid())
-  listId String
-  name String
-  quantity Decimal? @db.Decimal(10, 2)
-  unit String?
-  note String?
-  priority Priority @default(NORMAL)
-  checked Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  list ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  id        String       @id @default(uuid())
+  listId    String
+  name      String
+  quantity  Decimal?     @db.Decimal(10, 2)
+  unit      String?
+  note      String?
+  priority  Priority     @default(NORMAL)
+  checked   Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  list      ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
   @@index([listId, checked, priority])
 }
 
 model FamilyEvent {
-  id String @id @default(uuid())
-  familyId String
-  title String
-  description String?
-  startsAt DateTime?
-  allDay Boolean @default(false)
-  dateOnly String?
-  reminderMinutes Int?
-  location String?
-  status EventStatus @default(SCHEDULED)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  participants EventParticipant[]
+  id               String             @id @default(uuid())
+  familyId         String
+  title            String
+  description      String?
+  startsAt         DateTime?
+  allDay           Boolean            @default(false)
+  dateOnly         String?
+  reminderMinutes  Int?
+  location         String?
+  status           EventStatus        @default(SCHEDULED)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  family           Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  participants     EventParticipant[]
+  googleCalendarId String?
+  googleEventId    String?
+  googleSyncStatus GoogleSyncStatus   @default(NOT_LINKED)
+  googleSyncedAt   DateTime?
+  healthRecordId   String?            @unique
+  healthRecord     HealthRecord?      @relation(fields: [healthRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([googleCalendarId, googleEventId])
   @@index([familyId, startsAt, status])
+  @@index([familyId, googleSyncStatus])
+}
+
+model GoogleCalendarConnection {
+  id                    String   @id @default(uuid())
+  familyId              String   @unique
+  connectedById         String
+  calendarId            String   @default("primary")
+  calendarSummary       String?
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String
+  accessTokenExpiresAt  DateTime
+  scopes                String[] @default([])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  family                Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  connectedBy           User     @relation(fields: [connectedById], references: [id], onDelete: Cascade)
+
+  @@index([connectedById])
+}
+
+model GoogleOAuthState {
+  id        String    @id @default(uuid())
+  stateHash String    @unique
+  familyId  String
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  family    Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, usedAt])
+}
+
+model GoogleAuthState {
+  id        String    @id @default(uuid())
+  stateHash String    @unique
+  returnUrl String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([expiresAt, usedAt])
 }
 
 model EventParticipant {
   eventId String
-  userId String
-  event FamilyEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  event   FamilyEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@id([eventId, userId])
 }
 
 model ChildProfile {
-  id String @id @default(uuid())
-  familyId String
-  createdById String
-  name String
-  birthDate DateTime?
-  relationship String?
-  note String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  createdBy User @relation("ChildCreatedBy", fields: [createdById], references: [id])
-  blockedModules String[] @default([])
-  healthRecords HealthRecord[]
-  documents Document[]
+  id             String         @id @default(uuid())
+  familyId       String
+  createdById    String
+  name           String
+  birthDate      DateTime?
+  relationship   String?
+  note           String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  family         Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdBy      User           @relation("ChildCreatedBy", fields: [createdById], references: [id])
+  blockedModules String[]       @default([])
+  healthRecords  HealthRecord[]
+  documents      Document[]
+  growthRecords  GrowthRecord[]
+
   @@index([familyId])
-  growthRecords GrowthRecord[]
 }
 
 model HealthRecord {
-  id String @id @default(uuid())
-  familyId String
-  childId String?
-  category HealthCategory
-  title String
-  recordDate DateTime?
-  notes String?
+  id           String         @id @default(uuid())
+  familyId     String
+  childId      String?
+  category     HealthCategory
+  title        String
+  recordDate   DateTime?
+  notes        String?
   professional String?
-  specialty String?
-  completedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  child ChildProfile? @relation(fields: [childId], references: [id], onDelete: SetNull)
+  specialty    String?
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  family       Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  child        ChildProfile?  @relation(fields: [childId], references: [id], onDelete: SetNull)
+  calendarEvent FamilyEvent?
+
   @@index([familyId, category])
 }
 
 model Document {
-  id String @id @default(uuid())
-  familyId String
-  childId String?
-  name String
-  category String
-  objectKey String
-  mimeType String
-  sizeBytes Int
-  description String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  child ChildProfile? @relation(fields: [childId], references: [id], onDelete: SetNull)
-  holder String?
+  id           String            @id @default(uuid())
+  familyId     String
+  childId      String?
+  name         String
+  category     String
+  objectKey    String
+  mimeType     String
+  sizeBytes    Int
+  description  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  family       Family            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  child        ChildProfile?     @relation(fields: [childId], references: [id], onDelete: SetNull)
+  holder       String?
   documentDate DateTime?
-  versions DocumentVersion[]
+  versions     DocumentVersion[]
+
   @@index([familyId, category])
 }
 
 model FinancialEntry {
-  id String @id @default(uuid())
-  familyId String
-  description String
-  amount Decimal @db.Decimal(12, 2)
-  category String
-  competence DateTime
-  status FinancialStatus @default(PLANNED)
-  recurrence String?
-  occurrenceOf String? @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  id           String          @id @default(uuid())
+  familyId     String
+  description  String
+  amount       Decimal         @db.Decimal(12, 2)
+  category     String
+  competence   DateTime
+  status       FinancialStatus @default(PLANNED)
+  recurrence   String?
+  occurrenceOf String?         @unique
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  family       Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
   @@index([familyId, competence, status])
 }
 
 model AuditLog {
-  id String @id @default(uuid())
-  familyId String?
-  actorId String?
-  action String
-  entity String
-  entityId String?
-  metadata Json?
+  id        String   @id @default(uuid())
+  familyId  String?
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
   createdAt DateTime @default(now())
-  family Family? @relation(fields: [familyId], references: [id], onDelete: SetNull)
-  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  family    Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
   @@index([familyId, createdAt])
   @@index([actorId, createdAt])
 }
 
 model FamilyInvite {
-  id String @id @default(uuid())
-  familyId String
-  tokenHash String @unique
-  email String?
-  role FamilyRole @default(MEMBER)
+  id        String     @id @default(uuid())
+  familyId  String
+  tokenHash String     @unique
+  email     String?
+  role      FamilyRole @default(MEMBER)
   expiresAt DateTime
-  usedAt DateTime?
+  usedAt    DateTime?
   revokedAt DateTime?
-  createdAt DateTime @default(now())
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  family    Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
   @@index([familyId, expiresAt])
 }
 
 model DocumentVersion {
-  id String @id @default(uuid())
+  id         String   @id @default(uuid())
   documentId String
-  objectKey String @unique
-  mimeType String
-  sizeBytes Int
-  createdAt DateTime @default(now())
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  objectKey  String   @unique
+  mimeType   String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
-  id String @id @default(uuid())
-  userId String
-  familyId String
-  category String
-  title String
-  route String
-  dedupKey String @unique
+  id          String    @id @default(uuid())
+  userId      String
+  familyId    String
+  category    String
+  title       String
+  route       String
+  dedupKey    String    @unique
   scheduledAt DateTime
   deliveredAt DateTime?
-  readAt DateTime?
-  attempts Int @default(0)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt      DateTime?
+  attempts    Int       @default(0)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, scheduledAt])
 }
 
 model PushDevice {
-  id String @id @default(uuid())
-  userId String
-  token String @unique
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
   createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model MailJob {
-  id String @id @default(uuid())
-  recipient String
-  subject String
-  text String
-  attempts Int @default(0)
+  id          String   @id @default(uuid())
+  recipient   String
+  subject     String
+  text        String
+  attempts    Int      @default(0)
   availableAt DateTime @default(now())
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 }
 
 model PrivacyRequest {
-  id String @id @default(uuid())
-  userId String
-  kind String
-  scope String[]
-  status String @default("REQUESTED")
-  note String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewedById String?
-  reviewedBy User? @relation("PrivacyReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewedAt DateTime?
+  id             String    @id @default(uuid())
+  userId         String
+  kind           String
+  scope          String[]
+  status         String    @default("REQUESTED")
+  note           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedById   String?
+  reviewedBy     User?     @relation("PrivacyReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
   resolutionNote String?
+
   @@index([status, createdAt])
 }
 
 model ObjectDeletionJob {
-  id String @id @default(uuid())
+  id        String   @id @default(uuid())
   objectKey String
   createdAt DateTime @default(now())
 }
 
 model GrowthRecord {
-  id String @id @default(uuid())
-  familyId String
-  childId String
-  measuredOn DateTime @db.Date
-  weightKg Decimal? @db.Decimal(6, 2)
-  heightCm Decimal? @db.Decimal(6, 2)
-  createdAt DateTime @default(now())
-  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  id         String       @id @default(uuid())
+  familyId   String
+  childId    String
+  measuredOn DateTime     @db.Date
+  weightKg   Decimal?     @db.Decimal(6, 2)
+  heightCm   Decimal?     @db.Decimal(6, 2)
+  createdAt  DateTime     @default(now())
+  family     Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  child      ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+
   @@index([familyId, childId, measuredOn])
 }

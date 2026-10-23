@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "concurrently -k -n API,WEB,WORKER \"npm run dev --workspace @familyhub/api\" \"npm run dev --workspace @familyhub/web\" \"npm run dev:worker --workspace @familyhub/api\"",
     "build": "npm run build --workspace @familyhub/api && npm run build --workspace @familyhub/web",
+    "build:favicon": "node scripts/build-favicon.mjs",
     "typecheck": "npm run typecheck --workspace @familyhub/api && npm run typecheck --workspace @familyhub/web",
     "lint": "eslint apps/api/src apps/web/src",
     "format": "prettier --write apps/api/src apps/api/prisma apps/web/src docs scripts/*.mjs eslint.config.mjs .github/workflows/ci.yml",

@@ -12,6 +12,7 @@ import {
   membership,
   verified,
 } from "../../shared/domain.js";
+import { syncGoogleEvent } from "../integrations/google-calendar-service.js";
 const fields = z
   .object({
     childId: z.string().uuid().nullable().optional(),
@@ -73,10 +74,23 @@ export async function registerHealthRoutes(app: FastifyInstance) {
           completedAt: completed ? new Date() : null,
         },
       });
+      const calendarEvent =
+        record.recordDate && record.recordDate > new Date() && !record.completedAt
+          ? await tx.familyEvent.create({
+              data: {
+                familyId,
+                healthRecordId: record.id,
+                title: record.title,
+                startsAt: record.recordDate,
+                status: "SCHEDULED",
+              } as never,
+            })
+          : null;
       await audit(tx, user.id, familyId, "HEALTH_CREATED", "HealthRecord", record.id);
-      return record;
+      return { record, calendarEvent };
     });
-    return reply.code(201).send(result);
+    if (result.calendarEvent) await syncGoogleEvent(result.calendarEvent.id);
+    return reply.code(201).send(result.record);
   });
   app.patch("/api/v1/health-records/:id", async (request) => {
     const user = await requireUser(request);
@@ -88,7 +102,7 @@ export async function registerHealthRoutes(app: FastifyInstance) {
     const member = await membership(user.id, original.familyId, true, "health");
     await childAccess(user.id, original.familyId, original.childId, "health");
     if (body.childId) await childAccess(user.id, original.familyId, body.childId, "health");
-    return db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const record = await tx.healthRecord.update({
         where: { id },
         data: {
@@ -110,8 +124,37 @@ export async function registerHealthRoutes(app: FastifyInstance) {
         "HealthRecord",
         id,
       );
-      return record;
+      const calendarEvent = await tx.familyEvent.findUnique({ where: { healthRecordId: id } as never });
+      if (record.recordDate && record.recordDate > new Date() && !record.completedAt) {
+        const data = {
+          familyId: record.familyId,
+          healthRecordId: record.id,
+          title: record.title,
+          startsAt: record.recordDate,
+          allDay: false,
+          dateOnly: null,
+          description: null,
+          location: null,
+          status: "SCHEDULED" as const,
+        };
+        if (calendarEvent) {
+          const updatedEvent = await tx.familyEvent.update({ where: { id: calendarEvent.id }, data });
+          return { record, calendarEvent: updatedEvent };
+        }
+        const createdEvent = await tx.familyEvent.create({ data: data as never });
+        return { record, calendarEvent: createdEvent };
+      }
+      if (calendarEvent) {
+        const cancelledEvent = await tx.familyEvent.update({
+          where: { id: calendarEvent.id },
+          data: { status: "CANCELLED" },
+        });
+        return { record, calendarEvent: cancelledEvent };
+      }
+      return { record, calendarEvent: null };
     });
+    if (result.calendarEvent) await syncGoogleEvent(result.calendarEvent.id);
+    return result.record;
   });
   app.delete("/api/v1/health-records/:id", async (request) => {
     const user = await requireUser(request);
@@ -121,10 +164,14 @@ export async function registerHealthRoutes(app: FastifyInstance) {
     if (!record) throw new HttpError(404, "Registro não encontrado");
     await membership(user.id, record.familyId, true, "health");
     await childAccess(user.id, record.familyId, record.childId, "health");
+    const calendarEvent = await db.familyEvent.findUnique({ where: { healthRecordId: id } as never });
     await db.$transaction(async (tx) => {
+      if (calendarEvent)
+        await tx.familyEvent.update({ where: { id: calendarEvent.id }, data: { status: "CANCELLED" } });
       await tx.healthRecord.delete({ where: { id } });
       await audit(tx, user.id, record.familyId, "HEALTH_DELETED", "HealthRecord", id);
     });
+    if (calendarEvent) await syncGoogleEvent(calendarEvent.id);
     return { message: "Registro excluído" };
   });
 }

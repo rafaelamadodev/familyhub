@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../../db.js";
 import { requireUser } from "../../plugins/auth.js";
-import { dayBounds, familyQuery, membership } from "../../shared/domain.js";
+import { audit, dayBounds, familyQuery, membership } from "../../shared/domain.js";
 export async function registerDashboardRoutes(app: FastifyInstance) {
   app.get("/api/v1/analytics/summary", async (request) => {
     const user = await requireUser(request);
@@ -21,11 +21,14 @@ export async function registerDashboardRoutes(app: FastifyInstance) {
   app.get("/api/v1/dashboard", async (request) => {
     const user = await requireUser(request);
     const { familyId } = familyQuery.parse(request.query);
-    const { family } = await membership(user.id, familyId);
+    const member = await membership(user.id, familyId);
+    const { family } = member;
     const { start, end, date } = dayBounds(family.timezone);
+    const canViewFinance = member.role === "ADMIN" || member.sensitivePermissions.includes("finance");
     return db.$transaction(
       async (tx) => {
-        const [tasks, todayCount, overdueCount, events, eventCount, lists] = await Promise.all([
+        if (canViewFinance) await audit(tx, user.id, familyId, "FINANCE_SUMMARY_READ", "FinancialEntry");
+        const [tasks, todayCount, overdueCount, events, eventCount, lists, finance] = await Promise.all([
           tx.task.findMany({
             where: { familyId, status: "OPEN", dueAt: { lt: end } },
             include: { assignee: { select: { id: true, name: true } } },
@@ -46,6 +49,16 @@ export async function registerDashboardRoutes(app: FastifyInstance) {
             orderBy: { createdAt: "desc" },
             take: 100,
           }),
+          canViewFinance
+            ? tx.financialEntry.aggregate({
+                where: {
+                  familyId,
+                  competence: new Date(`${date.slice(0, 7)}-01T00:00:00.000Z`),
+                  status: { not: "CANCELLED" },
+                },
+                _sum: { amount: true },
+              })
+            : Promise.resolve(null),
         ]);
         return {
           timezone: family.timezone,
@@ -54,6 +67,7 @@ export async function registerDashboardRoutes(app: FastifyInstance) {
           overdueCount,
           eventCount,
           shoppingCount: lists.reduce((sum, list) => sum + list._count.items, 0),
+          financeTotal: finance ? Number(finance._sum.amount ?? 0) : null,
           tasks,
           events,
           lists,

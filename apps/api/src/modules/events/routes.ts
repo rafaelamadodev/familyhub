@@ -4,6 +4,7 @@ import { db } from "../../db.js";
 import { requireUser } from "../../plugins/auth.js";
 import { audit, familyQuery, HttpError, idParams, localInstant, membership } from "../../shared/domain.js";
 import { scheduleNotification } from "../notifications/service.js";
+import { syncGoogleEvent } from "../integrations/google-calendar-service.js";
 const fields = z
   .object({
     title: z.string().trim().min(1).max(180),
@@ -60,7 +61,12 @@ export async function registerEventRoutes(app: FastifyInstance) {
       await audit(tx, user.id, familyId, "EVENT_CREATED", "FamilyEvent", event.id);
       return event;
     });
-    return reply.code(201).send(result);
+    await syncGoogleEvent(result.id);
+    const updated = await db.familyEvent.findUnique({
+      where: { id: result.id },
+      include: { participants: true },
+    });
+    return reply.code(201).send(updated);
   });
   app.patch("/api/v1/events/:id", async (request) => {
     const user = await requireUser(request);
@@ -77,7 +83,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
     const startsAt = local
       ? localInstant(allDay ? local.slice(0, 10) : local, member.family.timezone)
       : original.startsAt!;
-    return db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const event = await tx.familyEvent.update({
         where: { id },
         data: {
@@ -110,5 +116,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
       await audit(tx, user.id, event.familyId, "EVENT_UPDATED", "FamilyEvent", id);
       return event;
     });
+    await syncGoogleEvent(result.id);
+    return db.familyEvent.findUnique({ where: { id: result.id }, include: { participants: true } });
   });
 }

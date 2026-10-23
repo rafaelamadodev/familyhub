@@ -19,14 +19,16 @@ export function CalendarPage({
   const refresh = useRefresh();
   const members = useQuery({ queryKey: ["members", familyId], queryFn: () => domainApi.members(familyId) });
   const [editing, setEditing] = useState<FamilyEvent | "new" | null>(null);
-  const [view, setView] = useState("agenda");
+  const [view, setView] = useState("month");
   const [month, setMonth] = useState(localDateTime(new Date().toISOString(), timezone).slice(0, 7));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     const event = query.data?.find((item) => item.id === focusedId);
     if (event) {
       const date = event.dateOnly ?? localDateTime(event.startsAt, timezone);
       setMonth(date.slice(0, 7));
+      setSelectedDay(date.slice(0, 10));
       setView("agenda");
       setTimeout(
         () =>
@@ -68,7 +70,31 @@ export function CalendarPage({
     query.data?.filter((item) =>
       (item.dateOnly ?? localDateTime(item.startsAt, timezone)).startsWith(month),
     ) ?? [];
-  const days = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+  const year = Number(month.slice(0, 4));
+  const monthIndex = Number(month.slice(5, 7)) - 1;
+  const firstWeekday = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cellCount = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+  const today = localDateTime(new Date().toISOString(), timezone).slice(0, 10);
+  const calendarCells = Array.from({ length: cellCount }, (_, index) => {
+    const date = new Date(year, monthIndex, index - firstWeekday + 1);
+    const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return { date: day, number: date.getDate(), inMonth: date.getMonth() === monthIndex };
+  });
+  const eventsByDay = new Map<string, FamilyEvent[]>();
+  for (const event of query.data ?? []) {
+    const date = event.dateOnly ?? localDateTime(event.startsAt, timezone).slice(0, 10);
+    eventsByDay.set(date, [...(eventsByDay.get(date) ?? []), event]);
+  }
+  const agendaEvents = events.filter((event) => {
+    const date = event.dateOnly ?? localDateTime(event.startsAt, timezone).slice(0, 10);
+    return selectedDay ? date === selectedDay : true;
+  });
+  const moveMonth = (offset: number) => {
+    const date = new Date(year, monthIndex + offset, 1);
+    setMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedDay(null);
+  };
   async function status(event: FamilyEvent) {
     setError("");
     try {
@@ -94,31 +120,51 @@ export function CalendarPage({
           </button>
         )}
       </div>
-      <div className="filters">
-        <label>
-          Mês
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => {
-              if (e.target.value) setMonth(e.target.value);
+      <div className="calendar-toolbar">
+        <div className="calendar-month-controls">
+          <button className="calendar-step" aria-label="Mês anterior" onClick={() => moveMonth(-1)}>
+            ‹
+          </button>
+          <button
+            className="button button-secondary calendar-today"
+            onClick={() => {
+              setMonth(today.slice(0, 7));
+              setSelectedDay(today);
             }}
-          />
-        </label>
-        <button
-          className="button button-secondary"
-          aria-pressed={view === "agenda"}
-          onClick={() => setView("agenda")}
-        >
-          Agenda
-        </button>
-        <button
-          className="button button-secondary"
-          aria-pressed={view === "month"}
-          onClick={() => setView("month")}
-        >
-          Mês
-        </button>
+          >
+            Hoje
+          </button>
+          <button className="calendar-step" aria-label="Próximo mês" onClick={() => moveMonth(1)}>
+            ›
+          </button>
+          <label>
+            <span className="visually-hidden">Mês</span>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setMonth(e.target.value);
+                  setSelectedDay(null);
+                }
+              }}
+            />
+          </label>
+        </div>
+        <div className="calendar-view-switch" role="group" aria-label="Visualização do calendário">
+          <button aria-pressed={view === "month"} onClick={() => setView("month")}>
+            Mês
+          </button>
+          <button
+            aria-pressed={view === "agenda"}
+            onClick={() => {
+              setSelectedDay(null);
+              setView("agenda");
+            }}
+          >
+            Agenda
+          </button>
+        </div>
       </div>
       {editing && (
         <section className="panel editor">
@@ -127,7 +173,7 @@ export function CalendarPage({
             fields={fields}
             initial={
               editing === "new"
-                ? { reminderMinutes: 30 }
+                ? { reminderMinutes: 30, ...(selectedDay ? { startsAt: `${selectedDay}T09:00` } : {}) }
                 : {
                     title: editing.title,
                     startsAt: localDateTime(editing.startsAt, timezone),
@@ -154,48 +200,75 @@ export function CalendarPage({
         {view === "month" ? (
           <div className="calendar-grid">
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
-              <b key={day}>{day}</b>
+              <b className="calendar-weekday" key={day}>
+                {day}
+              </b>
             ))}
-            {Array.from(
-              { length: new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1).getDay() },
-              (_, i) => (
-                <div key={"empty" + i} />
-              ),
-            )}
-            {Array.from({ length: days }, (_, index) => {
-              const day = month + "-" + String(index + 1).padStart(2, "0");
+            {calendarCells.map(({ date, number, inMonth }) => {
+              const dayEvents = eventsByDay.get(date) ?? [];
               return (
-                <div className="calendar-day" key={day}>
-                  <b>{index + 1}</b>
-                  {events
-                    .filter(
-                      (event) =>
-                        (event.dateOnly ?? localDateTime(event.startsAt, timezone).slice(0, 10)) === day,
-                    )
-                    .map((event) => (
+                <div
+                  className={`calendar-day ${inMonth ? "" : "outside-month"} ${date === today ? "today" : ""} ${selectedDay === date ? "selected" : ""}`}
+                  key={date}
+                >
+                  <button
+                    className="calendar-date"
+                    aria-label={`${date}, ${dayEvents.length} compromissos`}
+                    onClick={() => {
+                      setSelectedDay(date);
+                      if (!inMonth) setMonth(date.slice(0, 7));
+                    }}
+                  >
+                    {number}
+                  </button>
+                  <div className="calendar-day-events">
+                    {dayEvents.slice(0, 3).map((event) => (
                       <button
+                        className={`calendar-event ${event.status === "CANCELLED" ? "cancelled" : ""}`}
                         key={event.id}
+                        title={`${event.allDay ? "Dia inteiro" : displayDate(event.startsAt, timezone)} — ${event.title}`}
                         onClick={() => {
+                          setSelectedDay(date);
                           setView("agenda");
                         }}
                       >
-                        {event.status === "CANCELLED" ? "Cancelado: " : ""}
-                        {event.title}
+                        {!event.allDay && <time>{localDateTime(event.startsAt, timezone).slice(11, 16)}</time>}
+                        <span>{event.title}</span>
                       </button>
                     ))}
+                    {dayEvents.length > 3 && (
+                      <button
+                        className="calendar-more"
+                        onClick={() => {
+                          setSelectedDay(date);
+                          setView("agenda");
+                        }}
+                      >
+                        +{dayEvents.length - 3} mais
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         ) : (
           <div className="record-list">
-            {!events.length && (
-              <div className="empty-state">
-                <h2>Seu mês está livre</h2>
-                <p>Adicione o próximo compromisso da família.</p>
+            {selectedDay && (
+              <div className="calendar-agenda-heading">
+                <h2>{new Date(`${selectedDay}T12:00:00`).toLocaleDateString("pt-BR", { dateStyle: "full" })}</h2>
+                <button className="text-button" onClick={() => setSelectedDay(null)}>
+                  Ver o mês todo
+                </button>
               </div>
             )}
-            {events.map((event) => (
+            {!agendaEvents.length && (
+              <div className="empty-state">
+                <h2>{selectedDay ? "Nenhum compromisso neste dia" : "Seu mês está livre"}</h2>
+                <p>{selectedDay ? "Esse dia está livre na agenda da família." : "Adicione o próximo compromisso da família."}</p>
+              </div>
+            )}
+            {agendaEvents.map((event) => (
               <article
                 id={"event-" + event.id}
                 className={event.id === focusedId ? "record-row focused-record" : "record-row"}

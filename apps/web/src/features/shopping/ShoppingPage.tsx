@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { domainApi, type ShoppingList, type ShoppingItem } from "../../api/domain";
+import { domainApi, downloadShoppingPdf, type ShoppingList, type ShoppingItem } from "../../api/domain";
 import { RecordForm, type Field } from "../../components/forms/RecordForm";
 import { AsyncState } from "../../components/ui/AsyncState";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { ErrorNotice } from "../../components/ui/ErrorNotice";
 import { useFamilyData, useRefresh } from "../useFamilyData";
 const itemFields: Field[] = [
   { name: "name", label: "Item", required: true },
@@ -27,6 +29,8 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
   const [selected, setSelected] = useState("");
   const [editing, setEditing] = useState<ShoppingItem | "new" | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ShoppingItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const list = query.data?.find((item) => item.id === selected) ?? query.data?.[0];
   async function act(work: () => Promise<unknown>) {
@@ -34,8 +38,12 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
     try {
       await work();
       await refresh();
+      return true;
     } catch (error) {
       setError((error as Error).message);
+      return false;
+    } finally {
+      setDeleting(false);
     }
   }
   return (
@@ -66,11 +74,7 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
           />
         </section>
       )}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNotice title="A alteração não foi concluída" message={error} />}
       <AsyncState pending={query.isPending} error={query.error} retry={query.refetch}>
         {!query.data?.length ? (
           <div className="empty-state">
@@ -116,6 +120,11 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
                     {list.status === "ACTIVE" ? "Arquivar" : "Reativar"}
                   </button>
                 </>
+              )}
+              {list && (
+                <button className="text-button" onClick={() => void downloadShoppingPdf(list.id)}>
+                  Baixar PDF
+                </button>
               )}
             </div>
             {renaming && list && (
@@ -198,10 +207,7 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
                       </button>
                       <button
                         className="danger-button"
-                        onClick={() => {
-                          if (confirm("Remover este item?"))
-                            void act(() => domainApi.remove("shopping-items", item.id));
-                        }}
+                        onClick={() => setPendingDelete(item)}
                       >
                         Remover
                       </button>
@@ -213,6 +219,20 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
           </>
         )}
       </AsyncState>
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Remover item da lista?"
+          description={`“${pendingDelete.name}” será removido de “${list?.name ?? "sua lista"}”.`}
+          confirmLabel="Remover item"
+          busy={deleting}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={async () => {
+            setDeleting(true);
+            if (await act(() => domainApi.remove("shopping-items", pendingDelete.id)))
+              setPendingDelete(null);
+          }}
+        />
+      )}
     </>
   );
 }

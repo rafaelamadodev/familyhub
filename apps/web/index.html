@@ -1,5 +1,22 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#f8f9fc" /><title>FamilyHub</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f8fc" />
+    <meta name="description" content="FamilyHub — a rotina da sua família, em harmonia." />
+    <meta property="og:image" content="/familyhub-logo.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/familyhub-mark.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/familyhub-mark.svg" />
+    <title>FamilyHub — rotina em harmonia</title>
+    <script>
+      document.documentElement.dataset.theme =
+        localStorage.getItem("familyhub.theme") === "dark" ? "dark" : "light";
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

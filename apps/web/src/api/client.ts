@@ -1,5 +1,6 @@
 import { z } from "zod";
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+export const API_URL = import.meta.env.VITE_API_URL ?? "";
+export const googleAuthUrl = `${API_URL}/api/v1/auth/google`;
 const userSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -55,7 +56,7 @@ export async function apiRequest<T>(
       ...options,
       credentials: "include",
       headers: {
-        "Content-Type": "application/json",
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: "Bearer " + token } : {}),
         ...(csrf() ? { "X-CSRF-Token": csrf() } : {}),
         ...options.headers,
@@ -83,11 +84,16 @@ export async function apiRequest<T>(
       throw new ApiError("Sessão expirada. Entre novamente.", 401);
     }
   }
-  if (!response.ok)
-    throw new ApiError(
-      (await response.json().catch(() => null))?.message ?? "Não foi possível concluir a operação",
-      response.status,
-    );
+  if (!response.ok) {
+    const message = (await response.json().catch(() => null))?.message as string | undefined;
+    const friendlyMessage =
+      message === "Requisição inválida"
+        ? "Não foi possível processar esta solicitação. Confira os dados e tente novamente."
+        : message === "Não foi possível concluir a operação"
+          ? "Não conseguimos concluir agora. Tente novamente em instantes."
+          : message || "Não conseguimos concluir agora. Tente novamente em instantes.";
+    throw new ApiError(friendlyMessage, response.status);
+  }
   const value =
     response.status === 204
       ? undefined

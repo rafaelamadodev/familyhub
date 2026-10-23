@@ -8,6 +8,7 @@ import { hashSecret, tokenHash, verifySecret } from "../../shared/security/passw
 import { limit } from "../../shared/security/rate-limit.js";
 import { HttpError, audit, idParams, verified } from "../../shared/domain.js";
 import { decryptTotp, encryptTotp, newTotpSecret, verifyTotp } from "../../shared/security/totp.js";
+import { hashOAuthState } from "../integrations/google-crypto.js";
 
 const email = z.string().trim().toLowerCase().email().max(254);
 const password = z.string().min(8).max(128);
@@ -15,6 +16,8 @@ const credentials = z.object({ email, password });
 const secretSchema = z.object({ token: z.string().min(20).max(256) });
 const generic = { message: "Se os dados informados permitirem, você receberá as instruções por e-mail." };
 const webUrl = () => (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
+const googleAuthRedirect = () => process.env.GOOGLE_AUTH_REDIRECT_URI ?? `${process.env.APP_URL ?? "http://localhost:3333"}/api/v1/auth/google/callback`;
+const googleAuthConfigured = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && googleAuthRedirect());
 const webSession = (
   reply: { setCookie: (name: string, value: string, options: Record<string, unknown>) => unknown },
   accessToken: string,
@@ -63,6 +66,90 @@ export async function verificationMail(tx: Prisma.TransactionClient, user: { id:
 }
 export async function registerAuthRoutes(app: FastifyInstance) {
   await registerAuthPlugin(app);
+  app.get("/api/v1/auth/google", async (request, reply) => {
+    if (!googleAuthConfigured()) throw new HttpError(503, "Login com Google ainda não foi configurado");
+    const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:5173,http://localhost:5174").split(",").map((item) => item.trim());
+    let returnUrl = webUrl();
+    try {
+      const origin = request.headers.referer ? new URL(request.headers.referer).origin : "";
+      if (allowedOrigins.includes(origin)) returnUrl = origin;
+    } catch {
+      // Use APP_URL when the browser does not provide a valid referrer.
+    }
+    const state = randomBytes(32).toString("base64url");
+    await db.googleAuthState.create({
+      data: { stateHash: hashOAuthState(state), returnUrl, expiresAt: new Date(Date.now() + 10 * 60_000) },
+    });
+    const target = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    target.search = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      redirect_uri: googleAuthRedirect(),
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      prompt: "select_account",
+    }).toString();
+    return reply.redirect(target.toString());
+  });
+  app.get("/api/v1/auth/google/callback", async (request, reply) => {
+    const query = z.object({ code: z.string().optional(), state: z.string().optional(), error: z.string().optional() }).parse(request.query);
+    const state = query.state ? await db.googleAuthState.findUnique({ where: { stateHash: hashOAuthState(query.state) } }) : null;
+    const redirect = (result: string, target = state?.returnUrl ?? webUrl()) => {
+      const url = new URL(target);
+      url.searchParams.set("googleAuth", result);
+      return reply.redirect(url.toString());
+    };
+    if (query.error) {
+      if (state) await db.googleAuthState.updateMany({ where: { id: state.id, usedAt: null }, data: { usedAt: new Date() } });
+      return redirect("denied");
+    }
+    if (!query.code || !query.state || !state || state.usedAt || state.expiresAt <= new Date() || !googleAuthConfigured())
+      return redirect("failed");
+    const consumed = await db.googleAuthState.updateMany({ where: { id: state.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } });
+    if (!consumed.count) return redirect("invalid-state");
+    try {
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code: query.code,
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          redirect_uri: googleAuthRedirect(),
+          grant_type: "authorization_code",
+        }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!tokenResponse.ok) return redirect("failed");
+      const tokens = (await tokenResponse.json()) as { access_token?: string };
+      if (!tokens.access_token) return redirect("failed");
+      const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!profileResponse.ok) return redirect("failed");
+      const profile = z.object({ sub: z.string().min(1), email: email, email_verified: z.boolean(), name: z.string().min(1).max(120), picture: z.string().url().optional() }).parse(await profileResponse.json());
+      if (!profile.email_verified) return redirect("unverified-email");
+      const result = await db.$transaction(async (tx) => {
+        let user = await tx.user.findUnique({ where: { googleSubject: profile.sub } });
+        if (!user) user = await tx.user.findUnique({ where: { email: profile.email } });
+        if (user) {
+          user = await tx.user.update({ where: { id: user.id }, data: { googleSubject: profile.sub, emailVerifiedAt: user.emailVerifiedAt ?? new Date(), ...(user.photoUrl ? {} : { photoUrl: profile.picture ?? null }) } });
+        } else {
+          user = await tx.user.create({ data: { name: profile.name, email: profile.email, googleSubject: profile.sub, passwordHash: await hashSecret(randomBytes(48).toString("base64url")), emailVerifiedAt: new Date(), photoUrl: profile.picture ?? null } });
+        }
+        const session = await issueSession(tx, app, user.id, request.headers["user-agent"]);
+        await audit(tx, user.id, null, "GOOGLE_LOGIN", "Session");
+        return { ...session, user: publicUser(user) };
+      });
+      webSession(reply, result.accessToken);
+      reply.setCookie("familyhub_refresh", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/v1/auth", maxAge: 30 * 86400 });
+      webCsrf(request, reply);
+      return redirect("success");
+    } catch {
+      return redirect("failed");
+    }
+  });
   app.post("/api/v1/auth/register", async (request, reply) => {
     const body = credentials.extend({ name: z.string().trim().min(2).max(120) }).parse(request.body);
     await limit(request, "register", body.email, 5);

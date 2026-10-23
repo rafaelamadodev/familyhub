@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ErrorNotice } from "./ErrorNotice";
 export function AsyncState({
   pending,
   error,
@@ -19,7 +20,7 @@ export function AsyncState({
   if (error)
     return (
       <div className="panel" role="alert">
-        <p>{error.message}</p>
+        <ErrorNotice message={error.message} />
         <button className="button button-secondary" onClick={retry}>
           Tentar novamente
         </button>

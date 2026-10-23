@@ -26,6 +26,7 @@ const tokenFromHash = () => {
 };
 export function App() {
   const client = useQueryClient();
+  const [dark, setDark] = useState(() => localStorage.getItem("familyhub.theme") === "dark");
   const [user, setUser] = useState<User | null>(null);
   const [boot, setBoot] = useState(true);
   const [tokenAction, setTokenAction] = useState(tokenFromHash);
@@ -39,6 +40,40 @@ export function App() {
   const [focusedId, setFocusedId] = useState("");
   const [notice, setNotice] = useState("");
   const [offline, setOffline] = useState(!navigator.onLine);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const result = params.get("googleCalendar");
+    const googleAuth = params.get("googleAuth");
+    if (result) {
+      const family = params.get("familyId");
+      if (family) setFamilyId(family);
+      setRoute("Família");
+      setNotice(
+        result === "connected"
+          ? "Google Agenda conectado. Você já pode escolher o calendário e sincronizar seus compromissos."
+          : "Não foi possível conectar ao Google Agenda. Confira as configurações e tente novamente.",
+      );
+    }
+    if (googleAuth) {
+      setNotice(
+        googleAuth === "success"
+          ? "Entrada com Google concluída. Bem-vindo ao FamilyHub."
+          : "Não foi possível entrar com o Google. Tente novamente.",
+      );
+    }
+    if (!result && !googleAuth) return;
+    params.delete("googleCalendar");
+    params.delete("googleAuth");
+    params.delete("familyId");
+    const query = params.toString();
+    history.replaceState(null, "", location.pathname + (query ? `?${query}` : "") + location.hash);
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#11131b" : "#f7f8fc");
+    localStorage.setItem("familyhub.theme", dark ? "dark" : "light");
+  }, [dark]);
+  const toggleTheme = () => setDark((current) => !current);
   const me = useQuery({
     queryKey: ["me"],
     queryFn: api.me,
@@ -121,6 +156,8 @@ export function App() {
       <AuthPage
         notice={notice}
         tokenAction={tokenAction}
+        dark={dark}
+        onToggleTheme={toggleTheme}
         onLogin={async (credentials) => {
           const result = await api.login(credentials);
           if ("mfaRequired" in result) return result;
@@ -227,7 +264,13 @@ export function App() {
     switch (route) {
       case "Início":
         content = (
-          <DashboardPage name={user.name} familyId={family.id} readOnly={readOnly} onNavigate={navigate} />
+          <DashboardPage
+            name={user.name}
+            familyName={family.name}
+            familyId={family.id}
+            readOnly={readOnly}
+            onNavigate={navigate}
+          />
         );
         break;
       case "Tarefas":
@@ -294,7 +337,16 @@ export function App() {
         );
     }
   return (
-    <AppShell user={user} familyName={family.name} route={route} onNavigate={navigate} onLogout={logout}>
+    <AppShell
+      user={user}
+      familyName={family.name}
+      familyId={family.id}
+      route={route}
+      onNavigate={navigate}
+      onLogout={logout}
+      dark={dark}
+      onToggleTheme={toggleTheme}
+    >
       {offline && (
         <p className="form-error" role="alert">
           Você está offline. As alterações precisam de conexão para serem salvas.
