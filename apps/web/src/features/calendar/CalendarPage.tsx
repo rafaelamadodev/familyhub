@@ -232,7 +232,9 @@ export function CalendarPage({
                           setView("agenda");
                         }}
                       >
-                        {!event.allDay && <time>{localDateTime(event.startsAt, timezone).slice(11, 16)}</time>}
+                        {!event.allDay && (
+                          <time>{localDateTime(event.startsAt, timezone).slice(11, 16)}</time>
+                        )}
                         <span>{event.title}</span>
                       </button>
                     ))}
@@ -256,7 +258,9 @@ export function CalendarPage({
           <div className="record-list">
             {selectedDay && (
               <div className="calendar-agenda-heading">
-                <h2>{new Date(`${selectedDay}T12:00:00`).toLocaleDateString("pt-BR", { dateStyle: "full" })}</h2>
+                <h2>
+                  {new Date(`${selectedDay}T12:00:00`).toLocaleDateString("pt-BR", { dateStyle: "full" })}
+                </h2>
                 <button className="text-button" onClick={() => setSelectedDay(null)}>
                   Ver o mês todo
                 </button>
@@ -265,7 +269,11 @@ export function CalendarPage({
             {!agendaEvents.length && (
               <div className="empty-state">
                 <h2>{selectedDay ? "Nenhum compromisso neste dia" : "Seu mês está livre"}</h2>
-                <p>{selectedDay ? "Esse dia está livre na agenda da família." : "Adicione o próximo compromisso da família."}</p>
+                <p>
+                  {selectedDay
+                    ? "Esse dia está livre na agenda da família."
+                    : "Adicione o próximo compromisso da família."}
+                </p>
               </div>
             )}
             {agendaEvents.map((event) => (

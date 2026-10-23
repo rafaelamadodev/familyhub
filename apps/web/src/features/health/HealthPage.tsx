@@ -87,9 +87,9 @@ export function HealthPage({
       </div>
       <p className="form-notice">
         O FamilyHub organiza registros e horários. Registros com data futura também criam um lembrete no
-        calendário; quando o Google Agenda estiver conectado, enviamos o título, a data e o horário. Observações,
-        profissional, especialidade e dados da criança permanecem somente no FamilyHub. Isso não substitui
-        orientação de um profissional.
+        calendário; quando o Google Agenda estiver conectado, enviamos o título, a data e o horário.
+        Observações, profissional, especialidade e dados da criança permanecem somente no FamilyHub. Isso não
+        substitui orientação de um profissional.
       </p>
       {editing && (
         <section className="panel editor">
@@ -156,10 +156,7 @@ export function HealthPage({
                   <button className="text-button" onClick={() => setEditing(record)}>
                     Editar
                   </button>
-                  <button
-                    className="danger-button"
-                    onClick={() => setPendingDelete(record)}
-                  >
+                  <button className="danger-button" onClick={() => setPendingDelete(record)}>
                     Excluir
                   </button>
                 </div>
@@ -181,8 +178,7 @@ export function HealthPage({
           onCancel={() => setPendingDelete(null)}
           onConfirm={async () => {
             setDeleting(true);
-            if (await act(() => domainApi.remove("health-records", pendingDelete.id)))
-              setPendingDelete(null);
+            if (await act(() => domainApi.remove("health-records", pendingDelete.id))) setPendingDelete(null);
           }}
         />
       )}

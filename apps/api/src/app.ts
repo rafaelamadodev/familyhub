@@ -96,7 +96,9 @@ export async function buildApp() {
     if (known.statusCode === 413)
       return reply.code(413).send({ message: "Arquivo ou formulário excede o limite permitido" });
     if (known.statusCode === 400)
-      return reply.code(400).send({ message: "Não foi possível processar esta solicitação. Confira os dados e tente novamente." });
+      return reply.code(400).send({
+        message: "Não foi possível processar esta solicitação. Confira os dados e tente novamente.",
+      });
     if (["P2002", "P2034"].includes(known.code ?? ""))
       return reply
         .code(409)

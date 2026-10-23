@@ -30,7 +30,12 @@ export function ConfirmDialog({
         if (event.target === event.currentTarget && !busy) onCancel();
       }}
     >
-      <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+      <section
+        className="confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+      >
         <span className="confirm-icon" aria-hidden="true">
           !
         </span>

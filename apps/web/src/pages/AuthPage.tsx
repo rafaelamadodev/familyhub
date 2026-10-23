@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Brand } from "../components/Brand";
 import { googleAuthUrl } from "../api/client";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -15,8 +14,9 @@ export function AuthPage({
   dark: boolean;
   onToggleTheme: () => void;
 }) {
-  const [mode, setMode] = useState("login");
-  const [message, setMessage] = useState(notice ?? "");
+  void onLogin;
+  void _tokenAction;
+  const message = notice ?? "";
   const noticeIsError = /indisponível|expirou|não foi possível|inválid|falha|erro/i.test(message);
   return (
     <main className="auth-shell">
@@ -49,22 +49,20 @@ export function AuthPage({
           <Brand />
         </div>
         <p className="eyebrow">SEU ESPAÇO EM FAMÍLIA</p>
-        <h2>
-          Entre na sua conta
-        </h2>
+        <h2>Entre na sua conta</h2>
         {message && (
           <p className={`form-notice ${noticeIsError ? "auth-notice-error" : ""}`} role="status">
             {message}
           </p>
         )}
         <>
-            <div className="auth-divider">
-              <span>ou</span>
-            </div>
-            <a className="google-auth-button" href={googleAuthUrl}>
-              <span aria-hidden="true">G</span>
-              Continuar com Google
-            </a>
+          <div className="auth-divider">
+            <span>ou</span>
+          </div>
+          <a className="google-auth-button" href={googleAuthUrl}>
+            <span aria-hidden="true">G</span>
+            Continuar com Google
+          </a>
         </>
         <p className="subtitle">
           Seus dados de conta e rotina são usados para organizar sua família. Preferências e solicitações

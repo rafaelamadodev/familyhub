@@ -16,8 +16,11 @@ const credentials = z.object({ email, password });
 const secretSchema = z.object({ token: z.string().min(20).max(256) });
 const generic = { message: "Se os dados informados permitirem, você receberá as instruções por e-mail." };
 const webUrl = () => (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
-const googleAuthRedirect = () => process.env.GOOGLE_AUTH_REDIRECT_URI ?? `${process.env.APP_URL ?? "http://localhost:3333"}/api/v1/auth/google/callback`;
-const googleAuthConfigured = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && googleAuthRedirect());
+const googleAuthRedirect = () =>
+  process.env.GOOGLE_AUTH_REDIRECT_URI ??
+  `${process.env.APP_URL ?? "http://localhost:3333"}/api/v1/auth/google/callback`;
+const googleAuthConfigured = () =>
+  Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && googleAuthRedirect());
 const webSession = (
   reply: { setCookie: (name: string, value: string, options: Record<string, unknown>) => unknown },
   accessToken: string,
@@ -68,7 +71,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   await registerAuthPlugin(app);
   app.get("/api/v1/auth/google", async (request, reply) => {
     if (!googleAuthConfigured()) throw new HttpError(503, "Login com Google ainda não foi configurado");
-    const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:5173,http://localhost:5174").split(",").map((item) => item.trim());
+    const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:5173,http://localhost:5174")
+      .split(",")
+      .map((item) => item.trim());
     let returnUrl = webUrl();
     try {
       const origin = request.headers.referer ? new URL(request.headers.referer).origin : "";
@@ -92,20 +97,38 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     return reply.redirect(target.toString());
   });
   app.get("/api/v1/auth/google/callback", async (request, reply) => {
-    const query = z.object({ code: z.string().optional(), state: z.string().optional(), error: z.string().optional() }).parse(request.query);
-    const state = query.state ? await db.googleAuthState.findUnique({ where: { stateHash: hashOAuthState(query.state) } }) : null;
+    const query = z
+      .object({ code: z.string().optional(), state: z.string().optional(), error: z.string().optional() })
+      .parse(request.query);
+    const state = query.state
+      ? await db.googleAuthState.findUnique({ where: { stateHash: hashOAuthState(query.state) } })
+      : null;
     const redirect = (result: string, target = state?.returnUrl ?? webUrl()) => {
       const url = new URL(target);
       url.searchParams.set("googleAuth", result);
       return reply.redirect(url.toString());
     };
     if (query.error) {
-      if (state) await db.googleAuthState.updateMany({ where: { id: state.id, usedAt: null }, data: { usedAt: new Date() } });
+      if (state)
+        await db.googleAuthState.updateMany({
+          where: { id: state.id, usedAt: null },
+          data: { usedAt: new Date() },
+        });
       return redirect("denied");
     }
-    if (!query.code || !query.state || !state || state.usedAt || state.expiresAt <= new Date() || !googleAuthConfigured())
+    if (
+      !query.code ||
+      !query.state ||
+      !state ||
+      state.usedAt ||
+      state.expiresAt <= new Date() ||
+      !googleAuthConfigured()
+    )
       return redirect("failed");
-    const consumed = await db.googleAuthState.updateMany({ where: { id: state.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } });
+    const consumed = await db.googleAuthState.updateMany({
+      where: { id: state.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
     if (!consumed.count) return redirect("invalid-state");
     try {
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -128,22 +151,52 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         signal: AbortSignal.timeout(12_000),
       });
       if (!profileResponse.ok) return redirect("failed");
-      const profile = z.object({ sub: z.string().min(1), email: email, email_verified: z.boolean(), name: z.string().min(1).max(120), picture: z.string().url().optional() }).parse(await profileResponse.json());
+      const profile = z
+        .object({
+          sub: z.string().min(1),
+          email: email,
+          email_verified: z.boolean(),
+          name: z.string().min(1).max(120),
+          picture: z.string().url().optional(),
+        })
+        .parse(await profileResponse.json());
       if (!profile.email_verified) return redirect("unverified-email");
       const result = await db.$transaction(async (tx) => {
         let user = await tx.user.findUnique({ where: { googleSubject: profile.sub } });
         if (!user) user = await tx.user.findUnique({ where: { email: profile.email } });
         if (user) {
-          user = await tx.user.update({ where: { id: user.id }, data: { googleSubject: profile.sub, emailVerifiedAt: user.emailVerifiedAt ?? new Date(), ...(user.photoUrl ? {} : { photoUrl: profile.picture ?? null }) } });
+          user = await tx.user.update({
+            where: { id: user.id },
+            data: {
+              googleSubject: profile.sub,
+              emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+              ...(user.photoUrl ? {} : { photoUrl: profile.picture ?? null }),
+            },
+          });
         } else {
-          user = await tx.user.create({ data: { name: profile.name, email: profile.email, googleSubject: profile.sub, passwordHash: await hashSecret(randomBytes(48).toString("base64url")), emailVerifiedAt: new Date(), photoUrl: profile.picture ?? null } });
+          user = await tx.user.create({
+            data: {
+              name: profile.name,
+              email: profile.email,
+              googleSubject: profile.sub,
+              passwordHash: await hashSecret(randomBytes(48).toString("base64url")),
+              emailVerifiedAt: new Date(),
+              photoUrl: profile.picture ?? null,
+            },
+          });
         }
         const session = await issueSession(tx, app, user.id, request.headers["user-agent"]);
         await audit(tx, user.id, null, "GOOGLE_LOGIN", "Session");
         return { ...session, user: publicUser(user) };
       });
       webSession(reply, result.accessToken);
-      reply.setCookie("familyhub_refresh", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/v1/auth", maxAge: 30 * 86400 });
+      reply.setCookie("familyhub_refresh", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/api/v1/auth",
+        maxAge: 30 * 86400,
+      });
       webCsrf(request, reply);
       return redirect("success");
     } catch {

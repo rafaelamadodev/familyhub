@@ -12,15 +12,15 @@ Não use os serviços locais do Docker em produção: `localhost`, PostgreSQL do
 
 ## O que precisa existir
 
-| Parte       | Para que serve                                      | O que usar em produção                                         |
-| ----------- | --------------------------------------------------- | -------------------------------------------------------------- |
-| Site React  | Telas que você e sua esposa usam                    | Vercel                                                         |
-| API Fastify | Login, famílias, tarefas, agenda e demais operações | Vercel Functions                                              |
-| Worker      | Envia e-mails e processa a fila Redis               | Substituído por outbox PostgreSQL + Vercel Cron                |
-| Banco       | Guarda contas, famílias e registros                 | PostgreSQL gerenciado com backup                               |
-| Fila        | Mantém trabalhos de e-mail e tarefas assíncronas    | Outbox no PostgreSQL, sem worker persistente                   |
-| Arquivos    | Fotos e documentos privados                         | Armazenamento compatível com S3, bucket privado                |
-| E-mail      | Confirmação de conta e recuperação de senha         | SMTP de um provedor real, com remetente autorizado             |
+| Parte       | Para que serve                                      | O que usar em produção                             |
+| ----------- | --------------------------------------------------- | -------------------------------------------------- |
+| Site React  | Telas que você e sua esposa usam                    | Vercel                                             |
+| API Fastify | Login, famílias, tarefas, agenda e demais operações | Vercel Functions                                   |
+| Worker      | Envia e-mails e processa a fila Redis               | Substituído por outbox PostgreSQL + Vercel Cron    |
+| Banco       | Guarda contas, famílias e registros                 | PostgreSQL gerenciado com backup                   |
+| Fila        | Mantém trabalhos de e-mail e tarefas assíncronas    | Outbox no PostgreSQL, sem worker persistente       |
+| Arquivos    | Fotos e documentos privados                         | Armazenamento compatível com S3, bucket privado    |
+| E-mail      | Confirmação de conta e recuperação de senha         | SMTP de um provedor real, com remetente autorizado |
 
 O backend foi preparado para ser exposto como uma Vercel Function em `api/[...path].ts`. O worker persistente não deve ser publicado na Vercel: a próxima etapa é substituir BullMQ/Redis por envio HTTP de e-mail e processamento periódico da outbox via Vercel Cron.
 

@@ -205,10 +205,7 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
                       <button className="text-button" onClick={() => setEditing(item)}>
                         Editar
                       </button>
-                      <button
-                        className="danger-button"
-                        onClick={() => setPendingDelete(item)}
-                      >
+                      <button className="danger-button" onClick={() => setPendingDelete(item)}>
                         Remover
                       </button>
                     </div>
@@ -228,8 +225,7 @@ export function ShoppingPage({ familyId, readOnly }: { familyId: string; readOnl
           onCancel={() => setPendingDelete(null)}
           onConfirm={async () => {
             setDeleting(true);
-            if (await act(() => domainApi.remove("shopping-items", pendingDelete.id)))
-              setPendingDelete(null);
+            if (await act(() => domainApi.remove("shopping-items", pendingDelete.id))) setPendingDelete(null);
           }}
         />
       )}

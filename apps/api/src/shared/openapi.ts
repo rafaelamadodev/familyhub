@@ -120,7 +120,11 @@ const definitions: Array<[string, string, string]> = [
     "/api/v1/health-records/{id}",
     "Update a health record and synchronize its future calendar event containing only title, date, and time.",
   ],
-  ["delete", "/api/v1/health-records/{id}", "Delete a health record and remove its linked calendar reminder."],
+  [
+    "delete",
+    "/api/v1/health-records/{id}",
+    "Delete a health record and remove its linked calendar reminder.",
+  ],
   ["get", "/api/v1/finance", "List family finances; requires sensitive module permissions."],
   ["post", "/api/v1/finance", "Create a finance entry."],
   ["patch", "/api/v1/finance/{id}", "Update a finance entry."],

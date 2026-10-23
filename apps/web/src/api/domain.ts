@@ -81,8 +81,12 @@ export function downloadData(data: unknown, filename: string, csv = false) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export async function downloadShoppingPdf(listId: string, includePurchased = false) {
-  const response = await fetch(`${API_URL}/api/v1/shopping-lists/${listId}/pdf?includePurchased=${includePurchased}`, { credentials: "include" });
-  if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "Não foi possível gerar o PDF");
+  const response = await fetch(
+    `${API_URL}/api/v1/shopping-lists/${listId}/pdf?includePurchased=${includePurchased}`,
+    { credentials: "include" },
+  );
+  if (!response.ok)
+    throw new Error((await response.json().catch(() => null))?.message ?? "Não foi possível gerar o PDF");
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
