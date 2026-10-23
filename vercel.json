@@ -1,17 +1,27 @@
 {
-  "buildCommand": "npm run build --workspace @familyhub/web",
-  "outputDirectory": "apps/web/dist",
-  "installCommand": "npm install",
-  "functions": {
-    "api/[...path].ts": {
-      "maxDuration": 30
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": "apps/api",
+      "framework": "fastify",
+      "buildCommand": "npm run build",
+      "installCommand": "npm install",
+      "functions": {
+        "api/[...path].ts": { "maxDuration": 30 },
+        "api/cron/maintenance.ts": { "maxDuration": 30 }
+      }
     },
-    "api/cron/maintenance.ts": {
-      "maxDuration": 30
+    "web": {
+      "root": "apps/web",
+      "framework": "vite",
+      "buildCommand": "npm run build",
+      "installCommand": "npm install",
+      "outputDirectory": "dist"
     }
   },
   "crons": [{ "path": "/api/cron/maintenance", "schedule": "*/15 * * * *" }],
   "rewrites": [
-    { "source": "/((?!api(?:/|$)).*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
   ]
 }
