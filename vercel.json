@@ -8,6 +8,5 @@
     "api/[...path].ts": { "maxDuration": 30 },
     "api/cron/maintenance.ts": { "maxDuration": 30 }
   },
-  "crons": [{ "path": "/api/cron/maintenance", "schedule": "0 3 * * *" }],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "crons": [{ "path": "/api/cron/maintenance", "schedule": "0 3 * * *" }]
 }
