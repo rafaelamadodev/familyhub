@@ -5,8 +5,14 @@
   "installCommand": "npm install",
   "outputDirectory": "apps/web/dist",
   "functions": {
-    "api/[...path].ts": { "maxDuration": 30 },
+    "api/index.ts": { "maxDuration": 30 },
     "api/cron/maintenance.ts": { "maxDuration": 30 }
   },
-  "crons": [{ "path": "/api/cron/maintenance", "schedule": "0 3 * * *" }]
+  "crons": [{ "path": "/api/cron/maintenance", "schedule": "0 3 * * *" }],
+  "rewrites": [
+    {
+      "source": "^/api/(?!cron/)(.*)$",
+      "destination": "/api?__apiPath=$1"
+    }
+  ]
 }
