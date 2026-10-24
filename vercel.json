@@ -11,7 +11,7 @@
   "crons": [{ "path": "/api/cron/maintenance", "schedule": "0 3 * * *" }],
   "rewrites": [
     {
-      "source": "^/api/(?!cron/)(.*)$",
+      "source": "/api/((?!cron/).*)",
       "destination": "/api?__apiPath=$1"
     }
   ]

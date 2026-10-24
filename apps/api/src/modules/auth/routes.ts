@@ -90,7 +90,10 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       // Do not let a database outage surface as Vercel's opaque
       // FUNCTION_INVOCATION_FAILED page. Keep the reason out of the client,
       // but preserve a short code in the server logs for diagnosis.
-      app.log.error({ code: (error as { code?: string }).code ?? "DB_ERROR" }, "Falha ao iniciar login Google");
+      app.log.error(
+        { code: (error as { code?: string }).code ?? "DB_ERROR" },
+        "Falha ao iniciar login Google",
+      );
       throw new HttpError(503, "O serviço de login está temporariamente indisponível");
     }
     const target = new URL("https://accounts.google.com/o/oauth2/v2/auth");
