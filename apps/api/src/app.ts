@@ -22,7 +22,6 @@ import { registerGoogleCalendarRoutes } from "./modules/integrations/google-cale
 import { openApiDocument } from "./shared/openapi.js";
 import cookie from "@fastify/cookie";
 import swagger from "@fastify/swagger";
-import swaggerUi from "@fastify/swagger-ui";
 import { collectDefaultMetrics, register as metricsRegistry } from "prom-client";
 import type { OpenAPIV3 } from "openapi-types";
 
@@ -33,7 +32,14 @@ export async function buildApp() {
     mode: "static",
     specification: { document: openApiDocument as unknown as OpenAPIV3.Document },
   });
-  await app.register(swaggerUi, { routePrefix: "/docs" });
+  // swagger-ui pulls @fastify/static, whose current dependency chain uses a
+  // CommonJS require() against an ESM-only package on Vercel's Node 24 runtime.
+  // Keep the OpenAPI JSON route in production; load the optional UI only when
+  // explicitly enabled (for example, in local development).
+  if (process.env.ENABLE_SWAGGER_UI === "true") {
+    const swaggerUi = (await import("@fastify/swagger-ui")).default;
+    await app.register(swaggerUi, { routePrefix: "/docs" });
+  }
   collectDefaultMetrics({ register: metricsRegistry });
   const origins = (process.env.WEB_ORIGIN ?? "http://localhost:5173,http://localhost:5174")
     .split(",")
