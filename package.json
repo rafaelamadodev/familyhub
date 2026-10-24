@@ -1,6 +1,7 @@
 {
   "name": "familyhub",
   "private": true,
+  "type": "module",
   "version": "0.2.0",
   "workspaces": [
     "apps/web",
