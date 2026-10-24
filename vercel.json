@@ -3,7 +3,7 @@
   "services": {
     "api": {
       "root": "apps/api",
-      "framework": "fastify",
+      "framework": null,
       "buildCommand": "npm run db:generate && npm run build",
       "installCommand": "npm install",
       "functions": {
