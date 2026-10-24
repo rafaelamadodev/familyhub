@@ -70,7 +70,10 @@ export async function apiRequest<T>(
       0,
     );
   }
-  if (response.status === 401 && retry && !path.includes("/auth/login")) {
+  // A refresh cookie is paired with this readable CSRF cookie. Without it,
+  // refreshing cannot succeed, so return the 401 immediately (notably on the
+  // first visit, where /me is expected to be unauthenticated).
+  if (response.status === 401 && retry && !path.includes("/auth/login") && csrf()) {
     try {
       if (!refreshing)
         refreshing = refreshSession().finally(() => {

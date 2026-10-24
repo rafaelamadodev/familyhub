@@ -12,11 +12,22 @@ export async function limit(request: FastifyRequest, action: string, email?: str
     ...(email ? [action + ":email:" + tokenHash(email.toLowerCase())] : []),
   ];
   for (const key of keys) {
-    if (process.env.REDIS_URL) {
+    if (redis?.status === "ready") {
       try {
         const redisKey = "familyhub:rate:" + key;
-        const count = await redis!.incr(redisKey);
-        if (count === 1) await redis!.pexpire(redisKey, 15 * 60_000);
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        const count = await Promise.race([
+          (async () => {
+            const current = await redis.incr(redisKey);
+            if (current === 1) await redis.pexpire(redisKey, 15 * 60_000);
+            return current;
+          })(),
+          new Promise<never>((_resolve, reject) => {
+            timeout = setTimeout(() => reject(new Error("Redis rate-limit timeout")), 500);
+          }),
+        ]).finally(() => {
+          if (timeout) clearTimeout(timeout);
+        });
         if (count > maximum)
           throw new HttpError(429, "Muitas tentativas. Aguarde 15 minutos e tente novamente.");
         continue;
