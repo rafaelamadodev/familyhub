@@ -67,12 +67,8 @@ export async function registerShoppingRoutes(app: FastifyInstance) {
     if (!list) throw new HttpError(404, "Lista não encontrada");
     await membership(user.id, list.familyId);
     const items = list.items.filter((item) => includePurchased || !item.checked);
-    const priorityLabel = { HIGH: "Alta", NORMAL: "Normal", LOW: "Baixa" } as const;
     const lines = items.length
-      ? items.map(
-          (item) =>
-            `□ ${item.name}${item.quantity ? ` — ${item.quantity}${item.unit ? ` ${item.unit}` : ""}` : ""} · ${priorityLabel[item.priority]}${item.note ? ` · ${item.note}` : ""}`,
-        )
+      ? items.map((item) => `□ ${item.name}`)
       : [includePurchased ? "Nenhum item na lista." : "Nenhum item pendente."];
     const pdf = shoppingListPdf(`Lista de compras: ${list.name}`, list.family.name, lines);
     return reply
