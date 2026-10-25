@@ -6,9 +6,19 @@ function escapePdfText(value: string) {
     .replace(/[\r\n]+/g, " ");
 }
 
-export function shoppingListPdf(title: string, familyName: string, lines: string[]) {
-  const pages: string[][] = [];
-  for (let index = 0; index < lines.length; index += 42) pages.push(lines.slice(index, index + 42));
+export function shoppingListPdf(title: string, familyName: string, lines: string[], emptyMessage = "Nenhum item na lista.") {
+  const pages: { text: string; checkbox: boolean }[][] = [];
+  let rows: { text: string; checkbox: boolean }[] = [];
+  for (const name of lines) {
+    // Keep even long product names within the printable area.
+    const parts = name.replace(/[\r\n]+/g, " ").match(/.{1,52}(?:\s|$)|.{1,52}/g) ?? [""];
+    if (rows.length + parts.length > 24) {
+      pages.push(rows);
+      rows = [];
+    }
+    rows.push(...parts.map((text, index) => ({ text: text.trim(), checkbox: index === 0 })));
+  }
+  if (rows.length) pages.push(rows);
   if (!pages.length) pages.push([]);
 
   const objects: string[] = [];
@@ -18,7 +28,7 @@ export function shoppingListPdf(title: string, familyName: string, lines: string
   };
   const catalog = add("");
   const pagesObject = add("");
-  const font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
   const pageRefs: number[] = [];
 
   for (const pageLines of pages) {
@@ -32,13 +42,18 @@ export function shoppingListPdf(title: string, familyName: string, lines: string
       `(${escapePdfText(familyName)}) Tj`,
       "0 -16 Td",
       `(${escapePdfText(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`)}) Tj`,
-      "/F1 11 Tf",
-      "0 -28 Td",
+      "ET",
     ];
-    for (const line of pageLines) {
-      commands.push(`(${escapePdfText(line)}) Tj`, "0 -17 Td");
+    let y = 710;
+    if (!pageLines.length) {
+      commands.push("BT", "/F1 14 Tf", `50 ${y} Td`, `(${escapePdfText(emptyMessage)}) Tj`, "ET");
     }
-    commands.push("ET");
+    for (const line of pageLines) {
+      // Draw the checkbox: Unicode square glyphs are not supported by Latin-1.
+      if (line.checkbox) commands.push(`0.9 w 50 ${y - 1} 12 12 re S`);
+      commands.push("BT", "/F1 14 Tf", `74 ${y} Td`, `(${escapePdfText(line.text)}) Tj`, "ET");
+      y -= 27;
+    }
     const stream = commands.join("\n");
     const content = add(`<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`);
     const page = add(
