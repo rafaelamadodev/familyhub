@@ -465,3 +465,73 @@ body {
     min-height: 44px;
   }
 }
+
+/* Dashboard original, com as cores do visual atual. */
+.home-app .dashboard-shell .content {
+  max-width: none;
+  padding: 0;
+}
+.home-app .dashboard-page,
+:root:not([data-theme="dark"]) .home-app .dashboard-page,
+:root[data-theme="dark"] .home-app .dashboard-page {
+  background: var(--page);
+  color: var(--ink);
+  --surface: var(--surface-raised);
+  --line: color-mix(in srgb, var(--ink) 16%, transparent);
+  --muted: color-mix(in srgb, var(--ink) 68%, transparent);
+}
+:root:not([data-theme="dark"]) .home-app .dashboard-page { --page: #faf9f5; }
+:root[data-theme="dark"] .home-app .dashboard-page { --page: #20231f; }
+.home-app .dashboard-hero {
+  background-image:
+    linear-gradient(90deg, rgb(24 49 33 / 89%) 0%, rgb(32 62 41 / 62%) 52%, rgb(32 62 41 / 25%) 100%),
+    linear-gradient(0deg, rgb(23 44 30 / 55%), transparent 58%),
+    url("/familyhub-auth-hero.png");
+}
+.home-app .dashboard-kicker { color: #c6dfb7; }
+.home-app .dashboard-stat {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgb(32 51 36 / 9%);
+  backdrop-filter: none;
+}
+.home-app .stat-copy small, .home-app .stat-copy > span { color: var(--muted); }
+.home-app .stat-copy strong { color: var(--ink); }
+.home-app .dashboard-stat .stat-icon { background: var(--accent-soft); color: var(--primary); }
+.home-app .stat-progress { background: var(--accent-soft); }
+.home-app .stat-progress i { background: var(--primary); }
+.home-app .dashboard-card,
+:root:not([data-theme="dark"]) .home-app .dashboard-card,
+:root[data-theme="dark"] .home-app .dashboard-card {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  box-shadow: 0 8px 24px rgb(32 51 36 / 6%);
+  backdrop-filter: none;
+  color: var(--ink);
+}
+.home-app .dashboard-link, :root:not([data-theme="dark"]) .home-app .dashboard-link, .home-app .task-finish, .home-app .shortcut-arrow { color: var(--primary); }
+.home-app .dashboard-event-row,
+:root:not([data-theme="dark"]) .home-app .dashboard-event-row,
+:root[data-theme="dark"] .home-app .dashboard-event-row,
+.home-app .shortcut-grid > button,
+:root:not([data-theme="dark"]) .home-app .shortcut-grid > button,
+:root[data-theme="dark"] .home-app .shortcut-grid > button {
+  background: var(--surface-raised);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.home-app .dashboard-event-row:hover, .home-app .shortcut-grid > button:hover { border-color: var(--primary); }
+.home-app .event-date, :root:not([data-theme="dark"]) .home-app .event-date, :root[data-theme="dark"] .home-app .event-date,
+.home-app .task-tag, .home-app .event-category,
+.home-app .shortcut-icon { background: var(--accent-soft); color: var(--primary); }
+.home-app .task-tag.tag-overdue { background: #f7e7df; color: #9e3c2d; }
+.home-app .event-rule { background: var(--primary); }
+.home-app .dashboard-note { background: var(--accent-soft); color: var(--ink); border-color: var(--line); }
+.home-app .note-icon { color: var(--primary); }
+.home-app .note-orbit { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.home-app .dashboard-shortcuts h2, .home-app .dashboard-card-heading h2 { color: var(--ink); }
+@media (max-width: 820px) {
+  .home-app .dashboard-shell .content { padding: 0; }
+  .home-app .dashboard-content { padding-bottom: 28px; }
+}
