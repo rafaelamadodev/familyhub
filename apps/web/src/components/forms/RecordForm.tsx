@@ -13,6 +13,7 @@ export type Field = {
     | "password"
     | "select"
     | "checkbox"
+    | "weekdays"
     | "multiselect";
   required?: boolean;
   options?: { value: string; label: string }[];
@@ -55,7 +56,7 @@ export function RecordForm({
               values[field.name] ??
               (field.type === "checkbox"
                 ? false
-                : field.type === "multiselect"
+                : field.type === "multiselect" || field.type === "weekdays"
                   ? []
                   : field.type === "number"
                     ? null
@@ -68,77 +69,106 @@ export function RecordForm({
         }
       }}
     >
-      {fields.map((field) => (
-        <label key={field.name}>
-          {field.label}
-          {field.type === "textarea" ? (
-            <textarea
-              maxLength={2000}
-              value={String(values[field.name] ?? "")}
-              required={field.required}
-              onChange={(event) => change(field.name, event.target.value)}
-            />
-          ) : field.type === "multiselect" ? (
-            <select
-              multiple
-              value={(values[field.name] ?? []) as string[]}
-              onChange={(event) =>
-                change(
-                  field.name,
-                  Array.from(event.target.selectedOptions).map((option) => option.value),
-                )
-              }
-            >
-              {field.options?.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          ) : field.type === "select" ? (
-            <select
-              required={field.required}
-              value={String(values[field.name] ?? "")}
-              onChange={(event) => change(field.name, event.target.value)}
-            >
-              <option value="">Selecione</option>
-              {field.options?.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          ) : field.type === "checkbox" ? (
-            <input
-              type="checkbox"
-              checked={Boolean(values[field.name])}
-              onChange={(event) => change(field.name, event.target.checked)}
-            />
-          ) : (
-            <input
-              type={field.type ?? "text"}
-              value={String(values[field.name] ?? "")}
-              required={field.required}
-              min={field.min}
-              max={field.max}
-              step={field.step}
-              maxLength={field.maxLength ?? (field.type === "password" ? 128 : 2000)}
-              autoComplete={field.type === "password" ? "current-password" : undefined}
-              onChange={(event) =>
-                change(
-                  field.name,
-                  field.type === "number"
-                    ? event.target.value === ""
-                      ? null
-                      : Number(event.target.value)
-                    : event.target.value,
-                )
-              }
-            />
-          )}
-          {field.hint && <small>{field.hint}</small>}
-        </label>
-      ))}
+      {fields.map((field) =>
+        field.type === "weekdays" ? (
+          <fieldset className="weekday-field" key={field.name}>
+            <legend>{field.label}</legend>
+            {field.hint && <small>{field.hint}</small>}
+            <div className="weekday-options">
+              {field.options?.map((option) => {
+                const selected = Array.isArray(values[field.name]) ? (values[field.name] as string[]) : [];
+                return (
+                  <label key={option.value}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(option.value)}
+                      onChange={(event) =>
+                        change(
+                          field.name,
+                          event.target.checked
+                            ? [...selected, option.value]
+                            : selected.filter((day) => day !== option.value),
+                        )
+                      }
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : (
+          <label key={field.name}>
+            {field.label}
+            {field.type === "textarea" ? (
+              <textarea
+                maxLength={2000}
+                value={String(values[field.name] ?? "")}
+                required={field.required}
+                onChange={(event) => change(field.name, event.target.value)}
+              />
+            ) : field.type === "multiselect" ? (
+              <select
+                multiple
+                value={(values[field.name] ?? []) as string[]}
+                onChange={(event) =>
+                  change(
+                    field.name,
+                    Array.from(event.target.selectedOptions).map((option) => option.value),
+                  )
+                }
+              >
+                {field.options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : field.type === "select" ? (
+              <select
+                required={field.required}
+                value={String(values[field.name] ?? "")}
+                onChange={(event) => change(field.name, event.target.value)}
+              >
+                <option value="">Selecione</option>
+                {field.options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : field.type === "checkbox" ? (
+              <input
+                type="checkbox"
+                checked={Boolean(values[field.name])}
+                onChange={(event) => change(field.name, event.target.checked)}
+              />
+            ) : (
+              <input
+                type={field.type ?? "text"}
+                value={String(values[field.name] ?? "")}
+                required={field.required}
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                maxLength={field.maxLength ?? (field.type === "password" ? 128 : 2000)}
+                autoComplete={field.type === "password" ? "current-password" : undefined}
+                onChange={(event) =>
+                  change(
+                    field.name,
+                    field.type === "number"
+                      ? event.target.value === ""
+                        ? null
+                        : Number(event.target.value)
+                      : event.target.value,
+                  )
+                }
+              />
+            )}
+            {field.hint && <small>{field.hint}</small>}
+          </label>
+        ),
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}

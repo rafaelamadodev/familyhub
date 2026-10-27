@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api, send, setSession, type User } from "../api/client";
 import { familyApi } from "../api/families";
-import { AppShell } from "../components/AppShell";
+import { AppShell, HousePage } from "../components/AppShell";
 import { FamilyOnboarding } from "../components/FamilyOnboarding";
 import { AsyncState } from "../components/ui/AsyncState";
 import { AuthPage } from "../pages/AuthPage";
@@ -262,6 +262,9 @@ export function App() {
     );
   else
     switch (route) {
+      case "Casa":
+        content = <HousePage onNavigate={navigate} />;
+        break;
       case "Início":
         content = (
           <DashboardPage

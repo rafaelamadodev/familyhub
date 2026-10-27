@@ -6,18 +6,45 @@ import { ThemeToggle } from "./ThemeToggle";
 import { GlobalSearch } from "./GlobalSearch";
 const items = [
   "Início",
+  "Calendário",
   "Tarefas",
   "Compras",
-  "Calendário",
-  "Família",
-  "Crianças",
-  "Saúde",
-  "Documentos",
   "Financeiro",
+  "Saúde",
+  "Crianças",
+  "Documentos",
+  "Família",
   "Notificações",
+  "Perfil",
   "Privacidade",
 ];
+const labels: Record<string, string> = {
+  Início: "Hoje",
+  Calendário: "Agenda",
+  Crianças: "Filhos",
+  Perfil: "Perfil e configurações",
+};
+const mobileItems = ["Início", "Calendário", "Compras", "Casa"];
+const houseGroups = [
+  { title: "Organização", items: ["Tarefas", "Financeiro", "Documentos"] },
+  { title: "Família", items: ["Saúde", "Crianças", "Família"] },
+  { title: "Sua conta", items: ["Notificações", "Perfil", "Privacidade"] },
+];
 const navIcons: Record<string, ReactNode> = {
+  Casa: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </>
+  ),
+  Perfil: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+    </>
+  ),
   Início: (
     <>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z" />
@@ -120,9 +147,10 @@ export function AppShell({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [menu]);
   return (
-    <>
+    <div className="home-app">
       <aside className={"sidebar " + (menu ? "mobile-open" : "")}>
         <Brand />
+        <p className="sidebar-family">{familyName}</p>
         <nav aria-label="Navegação principal">
           {items.map((item) => (
             <button
@@ -134,7 +162,7 @@ export function AppShell({
               <svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                 {navIcons[item]}
               </svg>
-              {item}
+              {labels[item] ?? item}
             </button>
           ))}
         </nav>
@@ -167,7 +195,7 @@ export function AppShell({
               </svg>
             </button>
             <span>
-              {familyName} / {route}
+              {familyName} / {labels[route] ?? route}
             </span>
           </div>
           <div className="actions">
@@ -189,12 +217,43 @@ export function AppShell({
         <section className="content">{children}</section>
       </main>
       <nav className="bottom-nav" aria-label="Acesso rápido">
-        {items.slice(0, 4).map((item) => (
-          <button className={route === item ? "active" : ""} key={item} onClick={() => go(item)}>
-            {item}
+        {mobileItems.map((item) => (
+          <button
+            className={route === item || (item === "Casa" && !mobileItems.includes(route)) ? "active" : ""}
+            aria-current={route === item ? "page" : undefined}
+            key={item}
+            onClick={() => go(item)}
+          >
+            <svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+              {navIcons[item]}
+            </svg>
+            {labels[item] ?? item}
           </button>
         ))}
       </nav>
-    </>
+    </div>
+  );
+}
+
+export function HousePage({ onNavigate }: { onNavigate: (route: string) => void }) {
+  return (
+    <div className="house-page">
+      <p className="home-eyebrow">Todos os espaços da família</p>
+      <h1>Nossa casa</h1>
+      {houseGroups.map((group) => (
+        <section key={group.title}>
+          <h2>{group.title}</h2>
+          {group.items.map((item) => (
+            <button className="house-row" key={item} onClick={() => onNavigate(item)}>
+              <svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                {navIcons[item]}
+              </svg>
+              <span>{labels[item] ?? (item === "Família" ? "Membros e convites" : item)}</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          ))}
+        </section>
+      ))}
+    </div>
   );
 }

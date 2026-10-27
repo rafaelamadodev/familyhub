@@ -87,6 +87,27 @@ export function nextOccurrence(date: Date, recurrence: string, timezone: string)
   if (options.UNTIL && next.toISODate()! > options.UNTIL) return next.toUTC().toJSDate();
   return next.toUTC().toJSDate();
 }
+export function weeklyEventDates(local: string, repeatUntil: string, repeatDays: string[], timezone: string) {
+  const start = DateTime.fromISO(local.slice(0, 10), { zone: timezone });
+  const end = DateTime.fromISO(repeatUntil, { zone: timezone });
+  if (
+    !start.isValid ||
+    start.toISODate() !== local.slice(0, 10) ||
+    !end.isValid ||
+    end.toISODate() !== repeatUntil ||
+    end < start ||
+    end > start.plus({ days: 365 })
+  )
+    throw new HttpError(400, "A data final deve estar entre o início e um ano depois");
+  const dayCodes = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+  const dates: string[] = [];
+  for (let day = start; day <= end; day = day.plus({ days: 1 })) {
+    if (repeatDays.includes(dayCodes[day.weekday - 1])) dates.push(`${day.toISODate()}${local.slice(10)}`);
+  }
+  if (!dates.length) throw new HttpError(400, "Nenhum dia selecionado ocorre nesse período");
+  if (dates.length > 100) throw new HttpError(400, "Escolha um período com até 100 ocorrências");
+  return dates;
+}
 export function dayBounds(timezone: string, now = new Date()) {
   const local = DateTime.fromJSDate(now, { zone: timezone });
   return {

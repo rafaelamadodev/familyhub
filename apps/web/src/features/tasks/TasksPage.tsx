@@ -4,6 +4,7 @@ import { domainApi, displayDate, localDateTime, type Task } from "../../api/doma
 import { RecordForm, type Field, type Values } from "../../components/forms/RecordForm";
 import { AsyncState } from "../../components/ui/AsyncState";
 import { useFamilyData, useRefresh } from "../useFamilyData";
+import { daysFromRule, weekdayOptions } from "../recurrence";
 
 export function TasksPage({
   familyId,
@@ -38,6 +39,10 @@ export function TasksPage({
       document.getElementById("task-" + focusedId)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [focusedId, query.data]);
   const members = useQuery({ queryKey: ["members", familyId], queryFn: () => domainApi.members(familyId) });
+  const legacyRule =
+    editing && editing !== "new" && editing.recurrence && !daysFromRule(editing.recurrence).length
+      ? editing.recurrence
+      : null;
   const fields: Field[] = [
     { name: "title", label: "Título", required: true },
     { name: "description", label: "Descrição", type: "textarea" },
@@ -60,18 +65,50 @@ export function TasksPage({
       ],
     },
     {
-      name: "recurrence",
-      label: "Recorrência",
-      hint: "Regra: DAILY, WEEKLY;INTERVAL=2 ou WEEKLY;BYDAY=MO,WE. Dias: MO,TU,WE,TH,FR,SA,SU.",
-      maxLength: 90,
+      name: "recurrenceDays",
+      label: "Repetir toda semana",
+      type: "weekdays",
+      options: weekdayOptions,
+      hint: "Escolha os dias; deixe todos desmarcados para uma tarefa única. Informe um vencimento no primeiro dia escolhido.",
     },
+    ...(legacyRule
+      ? [
+          {
+            name: "keepPreviousRecurrence",
+            label: `Manter repetição anterior (${legacyRule})`,
+            type: "checkbox" as const,
+            hint: "Desmarque para remover a repetição anterior. Para trocar por dias da semana, selecione os dias acima.",
+          },
+        ]
+      : []),
   ];
   const save = async (values: Values) => {
+    const { recurrenceDays, keepPreviousRecurrence, ...otherValues } = values;
+    const days = Array.isArray(recurrenceDays) ? recurrenceDays : [];
+    const previous = editing !== "new" && editing ? editing.recurrence : null;
+    const previousDays = daysFromRule(previous);
+    const unchanged = [...days].sort().join(",") === [...previousDays].sort().join(",");
+    const recurrence =
+      previous && unchanged && (!legacyRule || keepPreviousRecurrence)
+        ? previous
+        : days.length
+          ? `WEEKLY;BYDAY=${weekdayOptions
+              .filter((day) => days.includes(day.value))
+              .map((day) => day.value)
+              .join(",")}`
+          : null;
+    if (days.length && !values.dueAt) throw new Error("Informe o vencimento da primeira ocorrência.");
+    if (days.length && values.dueAt) {
+      const weekday = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][
+        new Date(`${String(values.dueAt).slice(0, 10)}T12:00:00`).getDay()
+      ];
+      if (!days.includes(weekday)) throw new Error("O vencimento deve cair em um dos dias selecionados.");
+    }
     const body = {
-      ...values,
+      ...otherValues,
       dueAt: values.dueAt || null,
       assigneeId: values.assigneeId || null,
-      recurrence: values.recurrence || null,
+      recurrence,
     };
     if (editing === "new") await domainApi.create("tasks", { ...body, familyId });
     else await domainApi.update("tasks", editing!.id, body);
@@ -146,7 +183,8 @@ export function TasksPage({
                     dueAt: localDateTime(editing.dueAt, timezone),
                     assigneeId: editing.assigneeId,
                     priority: editing.priority,
-                    recurrence: editing.recurrence,
+                    recurrenceDays: daysFromRule(editing.recurrence),
+                    ...(legacyRule ? { keepPreviousRecurrence: true } : {}),
                   }
             }
             onSubmit={save}

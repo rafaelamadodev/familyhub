@@ -4,6 +4,7 @@ import { domainApi, displayDate, localDateTime, type FamilyEvent } from "../../a
 import { RecordForm, type Field } from "../../components/forms/RecordForm";
 import { AsyncState } from "../../components/ui/AsyncState";
 import { useFamilyData, useRefresh } from "../useFamilyData";
+import { weekdayOptions } from "../recurrence";
 export function CalendarPage({
   familyId,
   timezone,
@@ -51,6 +52,23 @@ export function CalendarPage({
     { name: "allDay", label: "Dia inteiro", type: "checkbox" },
     { name: "description", label: "Descrição", type: "textarea" },
     { name: "location", label: "Local" },
+    ...(editing === "new"
+      ? [
+          {
+            name: "repeatDays",
+            label: "Repetir toda semana",
+            type: "weekdays" as const,
+            options: weekdayOptions,
+            hint: "Escolha os dias; deixe vazio para um evento único. Cada data cria um evento independente.",
+          },
+          {
+            name: "repeatUntil",
+            label: "Repetir até",
+            type: "date" as const,
+            hint: "Obrigatório ao escolher dias. Até um ano e no máximo 100 eventos por criação.",
+          },
+        ]
+      : []),
     {
       name: "participantIds",
       label: "Participantes",
@@ -186,7 +204,14 @@ export function CalendarPage({
             }
             onCancel={() => setEditing(null)}
             onSubmit={async (values) => {
-              const body = { ...values, reminderMinutes: values.reminderMinutes ?? null };
+              const { repeatDays, repeatUntil, ...eventValues } = values;
+              const days = Array.isArray(repeatDays) ? repeatDays : [];
+              if (days.length && !repeatUntil) throw new Error("Informe até quando repetir o evento.");
+              const body = {
+                ...eventValues,
+                reminderMinutes: values.reminderMinutes ?? null,
+                ...(editing === "new" && days.length ? { repeatDays: days, repeatUntil } : {}),
+              };
               if (editing === "new") await domainApi.create("events", { ...body, familyId });
               else await domainApi.update("events", editing.id, body);
               setEditing(null);

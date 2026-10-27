@@ -2,7 +2,15 @@ import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import { db } from "../../db.js";
 import { requireUser } from "../../plugins/auth.js";
-import { audit, familyQuery, HttpError, idParams, localInstant, membership } from "../../shared/domain.js";
+import {
+  audit,
+  familyQuery,
+  HttpError,
+  idParams,
+  localInstant,
+  membership,
+  weeklyEventDates,
+} from "../../shared/domain.js";
 import { scheduleNotification } from "../notifications/service.js";
 import { syncGoogleEvent } from "../integrations/google-calendar-service.js";
 const fields = z
@@ -31,39 +39,67 @@ export async function registerEventRoutes(app: FastifyInstance) {
   });
   app.post("/api/v1/events", async (request, reply) => {
     const user = await requireUser(request);
-    const { familyId, ...body } = fields.extend({ familyId: z.string().uuid() }).parse(request.body);
+    const { familyId, repeatDays, repeatUntil, ...body } = fields
+      .extend({
+        familyId: z.string().uuid(),
+        repeatDays: z
+          .array(z.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]))
+          .max(7)
+          .default([]),
+        repeatUntil: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional(),
+      })
+      .parse(request.body);
     const member = await membership(user.id, familyId, true);
     const { participantIds, startsAt: local, ...data } = body;
     for (const id of participantIds) await membership(id, familyId);
-    const startsAt = localInstant(body.allDay ? local.slice(0, 10) : local, member.family.timezone);
-    const result = await db.$transaction(async (tx) => {
-      const event = await tx.familyEvent.create({
-        data: {
-          ...data,
-          familyId,
-          startsAt,
-          dateOnly: body.allDay ? local.slice(0, 10) : null,
-          participants: { create: [...new Set(participantIds)].map((userId) => ({ userId })) },
-        },
-        include: { participants: true },
-      });
-      if (event.reminderMinutes !== null && event.status === "SCHEDULED")
-        await scheduleNotification(
-          tx,
-          familyId,
-          "events",
-          event.id,
-          "Você tem um compromisso da família",
-          "Calendário/" + event.id,
-          new Date(startsAt.getTime() - event.reminderMinutes * 60_000),
-          event.updatedAt.toISOString(),
-        );
-      await audit(tx, user.id, familyId, "EVENT_CREATED", "FamilyEvent", event.id);
-      return event;
-    });
-    await syncGoogleEvent(result.id);
+    let occurrenceLocals = [local];
+    if (repeatDays.length) {
+      if (!repeatUntil) throw new HttpError(400, "Informe até quando repetir o evento");
+      occurrenceLocals = weeklyEventDates(local, repeatUntil, repeatDays, member.family.timezone);
+    }
+    const occurrences = occurrenceLocals.map((value) => ({
+      local: value,
+      startsAt: localInstant(body.allDay ? value.slice(0, 10) : value, member.family.timezone),
+    }));
+    const results = await db.$transaction(
+      async (tx) => {
+        const created = [];
+        for (const occurrence of occurrences) {
+          const event = await tx.familyEvent.create({
+            data: {
+              ...data,
+              familyId,
+              startsAt: occurrence.startsAt,
+              dateOnly: body.allDay ? occurrence.local.slice(0, 10) : null,
+              participants: { create: [...new Set(participantIds)].map((userId) => ({ userId })) },
+            },
+            include: { participants: true },
+          });
+          if (event.reminderMinutes !== null && event.status === "SCHEDULED")
+            await scheduleNotification(
+              tx,
+              familyId,
+              "events",
+              event.id,
+              "Você tem um compromisso da família",
+              "Calendário/" + event.id,
+              new Date(occurrence.startsAt.getTime() - event.reminderMinutes * 60_000),
+              event.updatedAt.toISOString(),
+            );
+          await audit(tx, user.id, familyId, "EVENT_CREATED", "FamilyEvent", event.id);
+          created.push(event);
+        }
+        return created;
+      },
+      { timeout: 20000 },
+    );
+    for (let index = 0; index < results.length; index += 10)
+      await Promise.all(results.slice(index, index + 10).map((result) => syncGoogleEvent(result.id)));
     const updated = await db.familyEvent.findUnique({
-      where: { id: result.id },
+      where: { id: results[0].id },
       include: { participants: true },
     });
     return reply.code(201).send(updated);
